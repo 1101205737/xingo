@@ -10,7 +10,12 @@ import (
 type GlobalObj struct {
 	OnConnectioned func(fconn iface.Iconnection)
 	OnClosed       func(fconn iface.Iconnection)
-	Protoc         interface{}
+	OnClusterConnectioned func(fconn iface.Iconnection)//集群rpc root节点回调
+	OnClusterClosed       func(fconn iface.Iconnection)
+	OnClusterCConnectioned func(fconn iface.Iclient)//集群rpc 子节点回调
+	OnClusterCClosed       func(fconn iface.Iclient)
+	Protoc         iface.IServerProtocol
+	RpcCProtoc     iface.IClientProtocol
 	TcpPort        int
 	MaxConn        int
 	//log
@@ -26,6 +31,7 @@ type GlobalObj struct {
 	MaxWorkerLen   int32
 	MaxSendChanLen int32
 	FrameSpeed     uint8
+	Name           string
 }
 
 var GlobalObject *GlobalObj
@@ -48,15 +54,19 @@ func init() {
 		FrameSpeed:     30,
 		OnConnectioned: func(fconn iface.Iconnection) {},
 		OnClosed:       func(fconn iface.Iconnection) {},
+		OnClusterConnectioned: func(fconn iface.Iconnection) {},
+		OnClusterClosed:       func(fconn iface.Iconnection) {},
+		OnClusterCConnectioned: func(fconn iface.Iclient) {},
+		OnClusterCClosed:       func(fconn iface.Iclient) {},
 	}
 	//读取用户自定义配置
 	data, err := ioutil.ReadFile("conf/server.json")
 	if err != nil {
-		logger.Fatal(err)
+		logger.Error(err)
 	}
 	err = json.Unmarshal(data, &GlobalObject)
 	if err != nil {
-		logger.Fatal(err)
+		logger.Error(err)
 	} else {
 		logger.Info("load conf successful!!!")
 	}

@@ -10,10 +10,7 @@ import (
 )
 
 func init() {
-	utils.GlobalObject.Protoc = &fnet.Protocol{
-		SendBuffChan: make(chan []byte, utils.GlobalObject.MaxSendChanLen),
-		ExtSendChan:  make(chan bool, 1),
-	}
+	utils.GlobalObject.Protoc = &fnet.Protocol{}
 	// --------------------------------------------init log start
 	logger.SetConsole(utils.GlobalObject.SetToConsole)
 	// logger.SetRollingFile(utils.GlobalObject.LogPath, utils.GlobalObject.LogName,
@@ -42,10 +39,9 @@ func (this *Server) handleConnection(conn *net.TCPConn) {
 	conn.SetNoDelay(true)
 	conn.SetKeepAlive(true)
 	// conn.SetDeadline(time.Now().Add(time.Minute * 2))
-	fconn := fnet.NewConnection(conn, this.GenNum, &fnet.Protocol{
-		SendBuffChan: make(chan []byte, utils.GlobalObject.MaxSendChanLen),
-		ExtSendChan:  make(chan bool, 1),
-	})
+	//fconn := fnet.NewConnection(conn, this.GenNum, &fnet.Protocol{})
+	fconn := fnet.NewConnection(conn, this.GenNum, utils.GlobalObject.Protoc)
+	//fconn := fnet.NewConnection(conn, this.GenNum, &cluster.RpcServerProtocol{})
 	fconn.Start()
 }
 
@@ -53,7 +49,7 @@ func (this *Server) Start() {
 	go func() {
 		if utils.GlobalObject.IsUsePool{
 			//init workpool
-			fnet.MsgHandleObj.InitWorkerPool(int(utils.GlobalObject.PoolSize))
+			utils.GlobalObject.Protoc.InitWorker(utils.GlobalObject.PoolSize)
 		}
 
 		ln, err := net.ListenTCP("tcp", &net.TCPAddr{
