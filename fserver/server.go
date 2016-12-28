@@ -7,6 +7,7 @@ import (
 	"net"
 	"time"
 	"github.com/viphxin/xingo/timer"
+	"github.com/viphxin/xingo/iface"
 )
 
 func init() {
@@ -26,7 +27,7 @@ type Server struct {
 	GenNum  uint32
 }
 
-func NewServer() *Server {
+func NewServer() iface.Iserver {
 	s := &Server{
 		Port:    utils.GlobalObject.TcpPort,
 		MaxConn: utils.GlobalObject.MaxConn,

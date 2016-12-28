@@ -11,7 +11,8 @@ type ClusterServerConf struct {
 	Name string
 	Host string
 	RootPort int
-	WebPort int
+	Http []interface{}//[port, staticfile_path]
+	Https []interface{}//[port, certFile, keyFile, staticfile_path]
 	NetPort int
 	Remotes []string
 	Module string
@@ -35,7 +36,7 @@ func NewClusterConf(path string) (*ClusterConf, error){
 		logger.Fatal(err)
 		return cconf, err
 	} else {
-		logger.Info("load cluster conf successful!!!")
+		logger.Debug("load cluster conf successful!!!")
 	}
 	return cconf, nil
 }

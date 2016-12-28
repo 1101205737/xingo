@@ -7,6 +7,7 @@ import (
 	"github.com/viphxin/xingo/logger"
 	"errors"
 	"sync"
+	"time"
 )
 
 type TcpClient struct{
@@ -46,6 +47,21 @@ func (this *TcpClient)Start(){
 
 func (this *TcpClient)Stop(){
 	this.protoc.OnConnectionLost(this)
+}
+
+func (this *TcpClient)ReConnection() bool{
+	logger.Info("reconnection ...")
+	for i := 0; i < 10; i++ {
+		logger.Info("retry time ", i)
+		conn, err := net.DialTCP("tcp", nil, this.addr)
+		if err == nil{
+			this.conn = conn
+			return true
+		}else{
+			time.Sleep(3*time.Second)
+		}
+	}
+	return false
 }
 
 func (this *TcpClient)Send(data []byte) error{

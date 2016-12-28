@@ -145,7 +145,7 @@ func (this *Connection) LostConnection() {
 
 func (this *Connection) StartWriteThread() {
 	go func() {
-		logger.Info("start send data from channel...")
+		logger.Debug("start send data from channel...")
 		for {
 			select {
 			case <-this.ExtSendChan:

@@ -35,7 +35,7 @@ func (this *RpcServerProtocol) OnConnectionLost(fconn iface.Iconnection) {
 }
 
 func (this *RpcServerProtocol) StartReadThread(fconn iface.Iconnection) {
-	logger.Info("start receive rpc data from socket...")
+	logger.Debug("start receive rpc data from socket...")
 	for {
 		//read per head data
 		headdata := make([]byte, DefaultRpcDataPack.GetHeadLen())
@@ -97,7 +97,7 @@ func (this *RpcClientProtocol)OnConnectionLost(fconn iface.Iclient){
 }
 
 func (this *RpcClientProtocol)StartReadThread(fconn iface.Iclient){
-	logger.Info("start receive rpc data from socket...")
+	logger.Debug("start receive rpc data from socket...")
 	for {
 		//read per head data
 		headdata := make([]byte, DefaultRpcDataPack.GetHeadLen())

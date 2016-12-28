@@ -51,7 +51,7 @@ func (this *ChildMgr)AddChild(name string, conn iface.IWriter){
 	defer this.Unlock()
 
 	this.childs[name] = NewChild(name, conn)
-	logger.Info(fmt.Sprintf("child %s connected.", name))
+	logger.Debug(fmt.Sprintf("child %s connected.", name))
 }
 
 func (this *ChildMgr)RemoveChild(name string){
@@ -59,7 +59,7 @@ func (this *ChildMgr)RemoveChild(name string){
 	defer this.Unlock()
 
 	delete(this.childs, name)
-	logger.Info(fmt.Sprintf("child %s lostconnection.", name))
+	logger.Debug(fmt.Sprintf("child %s lostconnection.", name))
 }
 
 func (this *ChildMgr)GetChild(name string) (*Child, error){

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"github.com/viphxin/xingo/logger"
 	"sync"
+	"fmt"
 )
 
 type ConnectionMsg struct {
@@ -15,7 +16,7 @@ func (this *ConnectionMsg) Add(conn *Connection) {
 	this.conMrgLock.Lock()
 	defer this.conMrgLock.Unlock()
 	this.connections[conn.SessionId] = conn
-	logger.Info(len(this.connections))
+	logger.Debug(fmt.Sprintf("Total connection: %d", len(this.connections)))
 }
 
 func (this *ConnectionMsg) Remove(conn *Connection) error {

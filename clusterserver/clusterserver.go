@@ -10,6 +10,11 @@ import (
 	"sync"
 	"github.com/viphxin/xingo/iface"
 	"github.com/viphxin/xingo/fserver"
+	"net/http"
+	"time"
+	"fmt"
+	"reflect"
+	"strings"
 )
 
 type ClusterServer struct {
@@ -17,6 +22,8 @@ type ClusterServer struct {
 	RemoteNodesMgr *cluster.ChildMgr//子节点有
 	ChildsMgr *cluster.ChildMgr//root节点有
 	MasterObj *fnet.TcpClient
+	httpServerMux *http.ServeMux
+	RootServer iface.Iserver
 	Cconf *cluster.ClusterConf
 	modules map[string][]interface{}//所有模块统一管理
 	sync.RWMutex
@@ -51,6 +58,7 @@ func NewClusterServer(name, path string) *ClusterServer{
 		RemoteNodesMgr: cluster.NewChildMgr(),
 		ChildsMgr: cluster.NewChildMgr(),
 		modules: make(map[string][]interface{}, 0),
+		httpServerMux: http.NewServeMux(),
 	}
 	utils.GlobalObject.Name = name
 	utils.GlobalObject.OnClusterClosed = DoCSConnectionLost
@@ -65,48 +73,81 @@ func NewClusterServer(name, path string) *ClusterServer{
 }
 
 func (this *ClusterServer)StartClusterServer() {
+	serverconf, ok := this.Cconf.Servers[utils.GlobalObject.Name]
+	if !ok{
+		panic("no server in clusterconf!!!")
+	}
 	//自动发现注册modules api
-	sconf, ok := this.Cconf.Servers[utils.GlobalObject.Name]
+	modules, ok := this.modules[serverconf.Module]
 	if ok{
-		modules, ok := this.modules[sconf.Module]
-		if ok{
-			if modules[0] != nil{
+		if modules[0] != nil{
+			if len(serverconf.Http) > 0 || len(serverconf.Https) > 0{
+				this.AddHttpRouter(modules[0])
+			}else{
 				this.AddRouter(modules[0])
 			}
+		}
 
-			if modules[1] != nil{
-				this.AddRpcRouter(modules[1])
-			}
+		if modules[1] != nil{
+			this.AddRpcRouter(modules[1])
 		}
 	}
 
 	//http server
-	//tcp server
-	serverconf, ok := this.Cconf.Servers[utils.GlobalObject.Name]
-	var s *fserver.Server
-	if ok{
-		if serverconf.NetPort > 0{
-			utils.GlobalObject.TcpPort = serverconf.NetPort
-			s = fserver.NewServer()
-			s.Start()
-		} else if serverconf.RootPort > 0{
-			utils.GlobalObject.TcpPort = serverconf.RootPort
-			s = fserver.NewServer()
-			s.Start()
+	if len(serverconf.Http) > 0{
+		//staticfile handel
+		if len(serverconf.Http) == 2{
+			this.httpServerMux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir(serverconf.Http[1].(string)))))
 		}
-	}else{
-		logger.Error("server " + utils.GlobalObject.Name +"conf not found!!!")
-		return
+		httpserver := &http.Server{
+			Addr:           fmt.Sprintf(":%d", int(serverconf.Http[0].(float64))),
+			Handler:        this.httpServerMux,
+			ReadTimeout:    5 * time.Second,
+			WriteTimeout:   5 * time.Second,
+			MaxHeaderBytes: 1 << 20,//1M
+		}
+		httpserver.SetKeepAlivesEnabled(true)
+		go httpserver.ListenAndServe()
+		logger.Info(fmt.Sprintf("http://%s:%d start", serverconf.Host,int(serverconf.Http[0].(float64))))
+	}else if len(serverconf.Https) > 2{
+		//staticfile handel
+		if len(serverconf.Https) == 4{
+			this.httpServerMux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir(serverconf.Https[3].(string)))))
+		}
+		httpserver := &http.Server{
+			Addr:           fmt.Sprintf(":%d", int(serverconf.Https[0].(float64))),
+			Handler:        this.httpServerMux,
+			ReadTimeout:    5 * time.Second,
+			WriteTimeout:   5 * time.Second,
+			MaxHeaderBytes: 1 << 20,//1M
+		}
+		httpserver.SetKeepAlivesEnabled(true)
+		go httpserver.ListenAndServeTLS(serverconf.Https[1].(string), serverconf.Https[2].(string))
+		logger.Info(fmt.Sprintf("http://%s:%d start", serverconf.Host,int(serverconf.Https[0].(float64))))
+	}
+	//tcp server
+	if serverconf.NetPort > 0{
+		utils.GlobalObject.TcpPort = serverconf.NetPort
+		this.RootServer = fserver.NewServer()
+		this.RootServer.Start()
+	} else if serverconf.RootPort > 0{
+		utils.GlobalObject.TcpPort = serverconf.RootPort
+		this.RootServer = fserver.NewServer()
+		this.RootServer.Start()
 	}
 	//master
 	this.ConnectToMaster()
+
+	logger.Info("xingo cluster start success.")
 	// close
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt, os.Kill)
-	sig := <-c
-	logger.Info("=======", sig)
+	<-c
 	this.MasterObj.Stop()
-	s.Stop()
+	if this.RootServer != nil{
+		this.RootServer.Stop()
+	}
+	logger.Info("xingo cluster stoped.")
 }
 
 func (this *ClusterServer)ConnectToMaster(){
@@ -117,7 +158,6 @@ func (this *ClusterServer)ConnectToMaster(){
 	rpc := cluster.NewChild(utils.GlobalObject.Name, this.MasterObj)
 	response, err := rpc.CallChildForResult("TakeProxy", utils.GlobalObject.Name)
 	if err == nil{
-		logger.Info(response.Result)
 		roots, ok := response.Result["roots"]
 		if ok{
 			for _, root := range roots.([]interface {}){
@@ -125,8 +165,7 @@ func (this *ClusterServer)ConnectToMaster(){
 			}
 		}
 	}else{
-		logger.Error("connected to master error: ")
-		logger.Error(err)
+		logger.Error("connected to master error: ", err)
 	}
 }
 
@@ -193,4 +232,19 @@ func (this *ClusterServer)RemoveRemote(name string){
 */
 func (this *ClusterServer)AddModule(mname string, module interface{}, rpcmodule interface{}){
 	this.modules[mname] = []interface{}{module, rpcmodule}
+}
+
+/*
+注册http的api到分布式服务器
+*/
+func (this *ClusterServer)AddHttpRouter(router interface{}){
+	value := reflect.ValueOf(router)
+	tp := value.Type()
+	for i := 0; i < value.NumMethod(); i += 1 {
+		name := tp.Method(i).Name
+		uri := fmt.Sprintf("/%s", strings.ToLower(strings.Replace(name, "Handle", "", 1)))
+		this.httpServerMux.HandleFunc(uri,
+			utils.HttpRequestWrap(uri, value.Method(i).Interface().(func(http.ResponseWriter, *http.Request))))
+		logger.Info("add http url: " + uri)
+	}
 }

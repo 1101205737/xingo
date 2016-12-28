@@ -68,6 +68,6 @@ func init() {
 	if err != nil {
 		logger.Error(err)
 	} else {
-		logger.Info("load conf successful!!!")
+		logger.Debug("load conf successful!!!")
 	}
 }
