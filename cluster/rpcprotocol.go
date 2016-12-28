@@ -72,7 +72,7 @@ func (this *RpcServerProtocol) StartReadThread(fconn iface.Iconnection) {
 
 				logger.Debug(fmt.Sprintf("rpc call. data len: %d. MsgType: %d", pkgHead.Len, int(rpcRequest.Rpcdata.MsgType)))
 				if utils.GlobalObject.IsUsePool{
-					RpcHandleObj.DoMsg2(rpcRequest)
+					RpcHandleObj.DoMsg1(rpcRequest)
 				}else{
 					RpcHandleObj.DoMsg2(rpcRequest)
 				}
@@ -132,7 +132,7 @@ func (this *RpcClientProtocol)StartReadThread(fconn iface.Iclient){
 
 				logger.Debug(fmt.Sprintf("rpc call. data len: %d. MsgType: %d", pkgHead.Len, rpcRequest.Rpcdata.MsgType))
 				if utils.GlobalObject.IsUsePool{
-					RpcHandleObj.DoMsg2(rpcRequest)
+					RpcHandleObj.DoMsg1(rpcRequest)
 				}else{
 					RpcHandleObj.DoMsg2(rpcRequest)
 				}

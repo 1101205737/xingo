@@ -13,11 +13,7 @@ import (
 func init() {
 	utils.GlobalObject.Protoc = &fnet.Protocol{}
 	// --------------------------------------------init log start
-	logger.SetConsole(utils.GlobalObject.SetToConsole)
-	// logger.SetRollingFile(utils.GlobalObject.LogPath, utils.GlobalObject.LogName,
-	// utils.GlobalObject.MaxLogNum, utils.GlobalObject.MaxFileSize, utils.GlobalObject.LogFileUnit)
-	logger.SetRollingDaily(utils.GlobalObject.LogPath, utils.GlobalObject.LogName)
-	logger.SetLevel(utils.GlobalObject.LogLevel)
+	utils.ReSettingLog()
 	// --------------------------------------------init log end
 }
 

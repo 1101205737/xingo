@@ -34,6 +34,10 @@ func NewMaster(path string) *Master{
 	utils.GlobalObject.OnClusterConnectioned = DoConnectionMade
 	utils.GlobalObject.OnClusterClosed = DoConnectionLost
 	utils.GlobalObject.Name = "master"
+	if cconf.Master.Log != ""{
+		utils.GlobalObject.LogName = cconf.Master.Log
+		utils.ReSettingLog()
+	}
 	return GlobalMaster
 }
 

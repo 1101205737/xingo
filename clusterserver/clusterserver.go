@@ -64,10 +64,20 @@ func NewClusterServer(name, path string) *ClusterServer{
 	utils.GlobalObject.OnClusterClosed = DoCSConnectionLost
 	utils.GlobalObject.OnClusterCClosed = DoCCConnectionLost
 	utils.GlobalObject.RpcCProtoc = &cluster.RpcClientProtocol{}
+
 	if GlobalClusterServer.Cconf.Servers[name].NetPort !=0 {
 		utils.GlobalObject.Protoc = &fnet.Protocol{}
+		if utils.GlobalObject.IsUsePool{
+			//init rpc worker pool
+			cluster.RpcHandleObj.InitWorkerPool(int(utils.GlobalObject.PoolSize))
+		}
 	}else{
 		utils.GlobalObject.Protoc = &cluster.RpcServerProtocol{}
+	}
+
+	if GlobalClusterServer.Cconf.Servers[name].Log != ""{
+		utils.GlobalObject.LogName = GlobalClusterServer.Cconf.Servers[name].Log
+		utils.ReSettingLog()
 	}
 	return GlobalClusterServer
 }
@@ -165,7 +175,7 @@ func (this *ClusterServer)ConnectToMaster(){
 			}
 		}
 	}else{
-		logger.Error("connected to master error: ", err)
+		panic(fmt.Sprintf("connected to master error: %s", err))
 	}
 }
 

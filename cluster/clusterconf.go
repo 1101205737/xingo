@@ -16,6 +16,7 @@ type ClusterServerConf struct {
 	NetPort int
 	Remotes []string
 	Module string
+	Log string
 }
 
 type ClusterConf struct {

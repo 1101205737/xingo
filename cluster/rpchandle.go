@@ -28,7 +28,43 @@ func init() {
 	}
 }
 
+/*
+处理rpc消息
+*/
 func (this *RpcMsgHandle) DoMsg(request *RpcRequest) {
+	if request.Rpcdata.MsgType == RESPONSE &&request.Rpcdata.Key != ""{
+		//放回异步结果
+		AResultGlobalObj.FillAsyncResult(request.Rpcdata.Key, request.Rpcdata)
+		return
+	}else{
+		//rpc 请求
+		if f, ok := RpcHandleObj.Apis[request.Rpcdata.Target]; ok {
+			//存在
+			st := time.Now()
+			if request.Rpcdata.MsgType == REQUEST_FORRESULT{
+				ret := f.Call([]reflect.Value{reflect.ValueOf(request)})
+				packdata, err := DefaultRpcDataPack.Pack(&RpcData{
+					MsgType: RESPONSE,
+					Result: ret[0].Interface().(map[string]interface{}),
+					Key: request.Rpcdata.Key,
+				})
+				if err == nil{
+					request.Fconn.Send(packdata)
+				}else{
+					logger.Error(err)
+				}
+			}else if request.Rpcdata.MsgType == REQUEST_NORESULT{
+				f.Call([]reflect.Value{reflect.ValueOf(request)})
+			}
+
+			logger.Debug(fmt.Sprintf("rpc %s cost total time: %f ms", request.Rpcdata.Target, time.Now().Sub(st).Seconds()*1000))
+		} else {
+			logger.Error(fmt.Sprintf("not found rpc:  %s", request.Rpcdata.Target))
+		}
+	}
+}
+
+func (this *RpcMsgHandle) DoMsg1(request *RpcRequest) {
 	//add to worker pool
 	index := rand.Int31n(utils.GlobalObject.PoolSize)
 	taskQueue := this.TaskQueue[index]
@@ -37,36 +73,7 @@ func (this *RpcMsgHandle) DoMsg(request *RpcRequest) {
 }
 
 func (this *RpcMsgHandle) DoMsg2(request *RpcRequest) {
-	go func() {
-		if request.Rpcdata.MsgType == RESPONSE &&request.Rpcdata.Key != ""{
-			//放回异步结果
-			AResultGlobalObj.FillAsyncResult(request.Rpcdata.Key, request.Rpcdata)
-			return
-		}else{
-			//rpc 请求
-			if f, ok := RpcHandleObj.Apis[request.Rpcdata.Target]; ok {
-				//存在
-				st := time.Now()
-				if request.Rpcdata.MsgType == REQUEST_FORRESULT{
-					ret := f.Call([]reflect.Value{reflect.ValueOf(request)})
-					packdata, err := DefaultRpcDataPack.Pack(&RpcData{
-						MsgType: RESPONSE,
-						Result: ret[0].Interface().(map[string]interface{}),
-						Key: request.Rpcdata.Key,
-					})
-					if err == nil{
-						request.Fconn.Send(packdata)
-					}
-				}else if request.Rpcdata.MsgType == REQUEST_NORESULT{
-					f.Call([]reflect.Value{reflect.ValueOf(request)})
-				}
-
-				logger.Debug(fmt.Sprintf("rpc %s cost total time: %f ms", request.Rpcdata.Target, time.Now().Sub(st).Seconds()*1000))
-			} else {
-				logger.Error(fmt.Sprintf("not found rpc:  %s", request.Rpcdata.Target))
-			}
-		}
-	}()
+	go this.DoMsg(request)
 }
 
 func (this *RpcMsgHandle) AddRouter(router interface{}) {
@@ -99,15 +106,7 @@ func (this *RpcMsgHandle) InitWorkerPool(poolSize int) {
 				}()
 				for {
 					request := <-taskQueue
-					//can goroutine?
-					if f, ok := RpcHandleObj.Apis[request.Rpcdata.Target]; ok {
-						//存在
-						st := time.Now()
-						f.Call([]reflect.Value{reflect.ValueOf(request)})
-						logger.Debug(fmt.Sprintf("rpc %s cost total time: %f ms", request.Rpcdata.Target, time.Now().Sub(st).Seconds()*1000))
-					} else {
-						logger.Error(fmt.Sprintf("not found rpc:  %s", request.Rpcdata.Target))
-					}
+					this.DoMsg(request)
 				}
 			}
 

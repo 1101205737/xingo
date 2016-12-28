@@ -46,6 +46,12 @@ const (
 	OFF
 )
 
+const (
+	_       = iota
+	ROLLINGDAILY
+	ROLLINGFILE
+)
+
 type _FILE struct {
 	dir      string
 	filename string

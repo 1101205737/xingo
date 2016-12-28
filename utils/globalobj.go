@@ -26,6 +26,7 @@ type GlobalObj struct {
 	LogFileUnit    logger.UNIT
 	LogLevel       logger.LEVEL
 	SetToConsole   bool
+	LogFileType    int32
 	PoolSize       int32
 	IsUsePool      bool
 	MaxWorkerLen   int32
@@ -47,6 +48,7 @@ func init() {
 		LogFileUnit:    logger.KB,
 		LogLevel:       logger.ERROR,
 		SetToConsole:   true,
+		LogFileType:    1,
 		PoolSize:       10,
 		IsUsePool:      true,
 		MaxWorkerLen:   1024 * 2,

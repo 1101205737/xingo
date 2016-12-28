@@ -22,3 +22,16 @@ func HttpRequestWrap(uri string, targat func(http.ResponseWriter, *http.Request)
 		logger.Debug(fmt.Sprintf("%s cost total time: %f ms", uri, time.Now().Sub(st).Seconds()*1000))
 	}
 }
+
+func ReSettingLog(){
+	// --------------------------------------------init log start
+	logger.SetConsole(GlobalObject.SetToConsole)
+	if GlobalObject.LogFileType == logger.ROLLINGFILE{
+		 logger.SetRollingFile(GlobalObject.LogPath, GlobalObject.LogName,
+		 GlobalObject.MaxLogNum, GlobalObject.MaxFileSize, GlobalObject.LogFileUnit)
+	}else{
+		logger.SetRollingDaily(GlobalObject.LogPath, GlobalObject.LogName)
+		logger.SetLevel(GlobalObject.LogLevel)
+	}
+	// --------------------------------------------init log end
+}
