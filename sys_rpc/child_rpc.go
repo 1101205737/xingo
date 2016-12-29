@@ -14,7 +14,7 @@ type ChildRpc struct {
 master 通知父节点上线, 收到通知的子节点需要链接对应父节点
 */
 func (this *ChildRpc)RootTakeProxy(request *cluster.RpcRequest){
-	logger.Info("dasdsadsadsa RootTakeProxy")
 	rname := request.Rpcdata.Args[0].(string)
+	logger.Info("root node %s online. connecting...", rname)
 	clusterserver.GlobalClusterServer.ConnectToRemote(rname)
 }

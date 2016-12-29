@@ -100,6 +100,10 @@ func (this *Connection) RemoveProperty(key string) {
 }
 
 func (this *Connection) Send(data []byte) error {
+	// 防止将Send放在go内造成的多线程冲突问题
+	this.sendtagGuard.Lock()
+	defer this.sendtagGuard.Unlock()
+
 	if !this.isClosed {
 		if _, err := this.Conn.Write(data); err != nil {
 			logger.Error(fmt.Sprintf("send data error.reason: %s", err))
