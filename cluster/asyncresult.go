@@ -70,22 +70,32 @@ func (this *AsyncResultMgr)Add() *AsyncResult{
 	return r
 }
 
-func (this *AsyncResultMgr)FillAsyncResult(key string, data *RpcData)error{
-	this.RLock()
-	defer this.RUnlock()
-
-	r, ok := this.results[key]
-	if ok{
-		r.SetResult(data)
-		return nil
-	}else{
-		return errors.New("no AsyncResult found!!!")
-	}
-}
-
 func (this *AsyncResultMgr)Remove(key string){
 	this.Lock()
 	defer this.Unlock()
 
 	delete(this.results, key)
+}
+
+func (this *AsyncResultMgr)GetAsyncResult(key string) (*AsyncResult, error){
+	this.RLock()
+	defer this.RUnlock()
+
+	r, ok := this.results[key]
+	if ok{
+		return r, nil
+	}else{
+		return nil, errors.New("not found AsyncResult")
+	}
+}
+
+func (this *AsyncResultMgr)FillAsyncResult(key string, data *RpcData)error{
+	r, err := this.GetAsyncResult(key)
+	if err == nil{
+		this.Remove(key)
+		r.SetResult(data)
+		return nil
+	}else{
+		return err
+	}
 }

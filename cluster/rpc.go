@@ -57,6 +57,8 @@ func (this *XingoRpc)CallRpcForResult(target string, args ...interface{}) (*RpcD
 		if err == nil{
 			return resp, nil
 		}else{
+			//超时了 或者其他原因结果没等到
+			this.asyncResultMgr.Remove(asyncR.GetKey())
 			return nil, err
 		}
 	}else{

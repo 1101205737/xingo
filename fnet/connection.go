@@ -101,7 +101,6 @@ func (this *Connection) RemoveProperty(key string) {
 
 func (this *Connection) Send(data []byte) error {
 	if !this.isClosed {
-
 		if _, err := this.Conn.Write(data); err != nil {
 			logger.Error(fmt.Sprintf("send data error.reason: %s", err))
 			return err
