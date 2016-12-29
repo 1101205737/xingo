@@ -1,5 +1,36 @@
-# xingo
-高性能golang网络库，游戏开发脚手架<br>
+# xingo_cluster
+==================
+    xingo_cluster是免费、开源、可定制、可扩展、节点支持“热更新”的高性能分布式游戏服务器开发框架，采用golang语言开发，天生携带高并发场景的处理基因，继承了
+golang语言本身的各种优点，开发简单易上手并且功能强大。它主要实现了基于Actor模式的网络库xingo，分布式节点间的高性能rpc通信，日志管理等，可以节省大量游戏开发
+时间，让游戏开发人员可以将主要精力放到游戏玩法和游戏逻辑上。真正实现了修改配置文件就可以搭建自定义的分布式游戏服务器架构。
+
+优势特点：
+1) 开发效率高
+2) 支持自定义的分布式架构，方便横向扩展节点，理论上只要有足够的物理机器，没有承载上限
+3) Actor模式降低游戏开发的心智负担
+4) 支持自定义通信协议
+5) 分布式节点自动发现
+6) worker pool工作线程池
+
+示例配置:
+{
+"master":{"host": "192.168.2.225","rootport":9999},
+"servers":{
+"gate":{"host": "192.168.2.225", "rootport":10000,"name":"gate", "module": "gate", "log": "gate.log"},
+"gate1":{"host": "192.168.2.225", "rootport":10001,"name":"gate1", "module": "gate", "log": "gate1.log"},
+"net1":{"host": "192.168.2.225", "netport":11009,"name":"net1","remotes":["gate", "gate1", "admin"], "module": "net", "log": "net.log"},
+"net2":{"host": "192.168.2.225", "netport":11009,"name":"net2","remotes":["gate", "gate1", "admin"], "module": "net", "log": "net.log"},
+"net3":{"host": "192.168.2.225", "netport":11009,"name":"net3","remotes":["gate", "gate1", "admin"], "module": "net", "log": "net.log"},
+"net4":{"host": "192.168.2.225", "netport":11009,"name":"net4","remotes":["gate", "gate1", "admin"], "module": "net", "log": "net.log"},
+"admin":{"host": "192.168.2.225", "remotes":["gate", "gate1"], "name":"admin", "module": "admin", "http": [8888, "/static"]},
+"game1":{"host": "192.168.2.225", "remotes":["gate", "gate1"], "name":"game1", "module": "game"}
+}
+}
+```html
+<iframe src="https://www.processon.com/view/link/5864c06ae4b049e79edb6e52"></iframe>
+
+```
+
 
 默认通信协议如下（支持自定义协议处理部分代码，支持灵活的重载协议部分代码）：<br>
 
