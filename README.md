@@ -13,6 +13,7 @@ golang语言本身的各种优点，开发简单易上手并且功能强大。�
 6) worker pool工作线程池
 
 示例配置:
+```json
 {
 "master":{"host": "192.168.2.225","rootport":9999},
 "servers":{
@@ -26,10 +27,9 @@ golang语言本身的各种优点，开发简单易上手并且功能强大。�
 "game1":{"host": "192.168.2.225", "remotes":["gate", "gate1"], "name":"game1", "module": "game"}
 }
 }
-```html
-<iframe src="https://www.processon.com/view/link/5864c06ae4b049e79edb6e52"></iframe>
-
 ```
+架构图：
+![alt text](https://github.com/viphxin/xingo_cluster/blob/master/conf/xingo_cluster_架构.png)
 
 
 默认通信协议如下（支持自定义协议处理部分代码，支持灵活的重载协议部分代码）：<br>
@@ -49,6 +49,7 @@ Data  []byte 数据<br>
   LogFileUnit:    logger.KB,//日志文件大小对应单位<br>
   LogLevel:       logger.ERROR,//日志级别<br>
   SetToConsole:   true,//是否输出到console<br>
+  LogFileType:    1,//日志切割方式1 按天切割 2按文件大小切割
   PoolSize:       10,//api接口工作线程数量<br>
   IsUsePool:      true,//是否使用worker pool false 每个请求开启单独的协程处理<br>
   MaxWorkerLen:   1024 * 2,//任务缓冲池大小<br>
@@ -69,4 +70,5 @@ Data  []byte 数据<br>
   具体使用请参考项目（也是xingo的demo（帧同步服务器））：<br>
   https://github.com/viphxin/fighting<br>
   mmo demo: https://git.oschina.net/viphxin/xingo_demo
+  xingo_cluster demo: https://github.com/viphxin/xingo_cluster
   
