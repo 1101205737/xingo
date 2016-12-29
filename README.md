@@ -36,7 +36,7 @@ xingo，分布式节点间的高性能rpc通信，日志管理等，可以节省
 }
 ```
 架构图：
-![alt text](conf/xingo_cluster_架构.png)
+![alt text](https://git.oschina.net/viphxin/xingo_cluster/raw/master/conf/xingo_cluster_架构.png)
 
 
 默认通信协议如下（支持自定义协议处理部分代码，支持灵活的重载协议部分代码）：<br>
