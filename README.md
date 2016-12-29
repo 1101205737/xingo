@@ -21,17 +21,17 @@ xingo，分布式节点间的高性能rpc通信，日志管理等，可以节省
     "servers":{
         "gate":{"host": "192.168.2.225", "rootport":10000,"name":"gate", "module": "gate", "log": "gate.log"},
         "gate1":{"host": "192.168.2.225", "rootport":10001,"name":"gate1", "module": "gate", "log": "gate1.log"},
-        "net1":{"host": "192.168.2.225", "netport":11009,"name":"net1","remotes":["gate", "gate1", "admin"], 
+        "net1":{"host": "192.168.2.225", "netport":11009,"name":"net1","remotes":["gate2", "gate1"], 
                     "module": "net", "log": "net.log"},
-        "net2":{"host": "192.168.2.225", "netport":11009,"name":"net2","remotes":["gate", "gate1", "admin"], 
+        "net2":{"host": "192.168.2.225", "netport":11009,"name":"net2","remotes":["gate2", "gate1"], 
                     "module": "net", "log": "net.log"},
-        "net3":{"host": "192.168.2.225", "netport":11009,"name":"net3","remotes":["gate", "gate1", "admin"], 
+        "net3":{"host": "192.168.2.225", "netport":11009,"name":"net3","remotes":["gate2", "gate1"], 
                     "module": "net", "log": "net.log"},
-        "net4":{"host": "192.168.2.225", "netport":11009,"name":"net4","remotes":["gate", "gate1", "admin"], 
+        "net4":{"host": "192.168.2.225", "netport":11009,"name":"net4","remotes":["gate2", "gate1"], 
                     "module": "net", "log": "net.log"},
-        "admin":{"host": "192.168.2.225", "remotes":["gate", "gate1"], "name":"admin", "module": "admin", 
+        "admin":{"host": "192.168.2.225", "remotes":["gate2", "gate1"], "name":"admin", "module": "admin", 
             "http": [8888, "/static"]},
-        "game1":{"host": "192.168.2.225", "remotes":["gate", "gate1"], "name":"game1", "module": "game"}
+        "game1":{"host": "192.168.2.225", "remotes":["gate2", "gate1"], "name":"game1", "module": "game"}
     }
 }
 ```
