@@ -1,5 +1,7 @@
 package logger
-
+/*
+https://github.com/donnie4w
+*/
 import (
 	"fmt"
 	"log"
