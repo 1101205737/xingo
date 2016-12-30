@@ -19,7 +19,7 @@ xingo，分布式节点间的高性能rpc通信，日志管理等，可以节省
 {
     "master":{"host": "192.168.2.225","rootport":9999},
     "servers":{
-        "gate":{"host": "192.168.2.225", "rootport":10000,"name":"gate", "module": "gate", "log": "gate.log"},
+        "gate2":{"host": "192.168.2.225", "rootport":10000,"name":"gate2", "module": "gate", "log": "gate2.log"},
         "gate1":{"host": "192.168.2.225", "rootport":10001,"name":"gate1", "module": "gate", "log": "gate1.log"},
         "net1":{"host": "192.168.2.225", "netport":11009,"name":"net1","remotes":["gate2", "gate1"], 
                     "module": "net", "log": "net.log"},
