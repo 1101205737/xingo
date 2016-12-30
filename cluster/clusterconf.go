@@ -3,7 +3,6 @@ package cluster
 import (
 	"encoding/json"
 	"io/ioutil"
-	"github.com/viphxin/xingo/logger"
 	"errors"
 )
 
@@ -29,16 +28,13 @@ func NewClusterConf(path string) (*ClusterConf, error){
 	//集群服务器配置信息
 	data, err := ioutil.ReadFile(path)
 	if err != nil {
-		logger.Fatal(err)
-		return cconf, err
+		panic(err)
 	}
 	err = json.Unmarshal(data, cconf)
 	if err != nil {
-		logger.Fatal(err)
-		return cconf, err
-	} else {
-		logger.Debug("load cluster conf successful!!!")
+		panic(err)
 	}
+
 	return cconf, nil
 }
 

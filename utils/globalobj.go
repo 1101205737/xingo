@@ -64,12 +64,10 @@ func init() {
 	//读取用户自定义配置
 	data, err := ioutil.ReadFile("conf/server.json")
 	if err != nil {
-		logger.Error(err)
+		panic(err)
 	}
 	err = json.Unmarshal(data, &GlobalObject)
 	if err != nil {
-		logger.Error(err)
-	} else {
-		logger.Debug("load conf successful!!!")
+		panic(err)
 	}
 }
