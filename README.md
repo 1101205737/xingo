@@ -1,6 +1,7 @@
 # xingo_cluster
 ==================
-xingo golang游戏开发交流群：535378240
+xingo golang游戏开发交流群：535378240<br>
+文档地址: http://www.w3cschool.cn/xingo/
 ```text
     xingo_cluster是免费、开源、可定制、可扩展、节点支持“热更新”的高性能分布式游戏服务器开发框架，采用golang语言开发，天
 生携带高并发场景的处理基因，继承了golang语言本身的各种优点，开发简单易上手并且功能强大。它主要实现了基于Actor模式的网络库
@@ -75,8 +76,8 @@ Data  []byte 数据<br>
 	//add api ---------------end<br>
   xingo会自动注册FightingRouter中的方法处理对应消息<br>
   例如：msgId =1 则会寻找FightingRouter中的Func_1的方法从进行处理<br>
-  具体使用请参考项目（也是xingo的demo（帧同步服务器））：<br>
-  https://github.com/viphxin/fighting<br>
+  具体使用请参考项目：<br>
+  帧同步服务器: https://github.com/viphxin/fighting<br>
   mmo demo: https://git.oschina.net/viphxin/xingo_demo<br>
   xingo_cluster demo: https://github.com/viphxin/xingo_cluster
   
