@@ -54,7 +54,8 @@ func (this *Connection) Stop() {
 
 	this.ExtSendChan <- true
 	this.isClosed = true
-	this.Protoc.OnConnectionLost(this)
+	//掉线回调放到go内防止，掉线回调处理出线死锁
+	go this.Protoc.OnConnectionLost(this)
 	//remove to connectionmsg
 	ConnectionManager.Remove(this)
 	close(this.ExtSendChan)
