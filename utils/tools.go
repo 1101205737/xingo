@@ -6,6 +6,7 @@ import (
 	"github.com/viphxin/xingo/logger"
 	"fmt"
 	"time"
+	"reflect"
 )
 
 func HttpRequestWrap(uri string, targat func(http.ResponseWriter, *http.Request)) func(http.ResponseWriter, *http.Request){
@@ -34,4 +35,16 @@ func ReSettingLog(){
 		logger.SetLevel(GlobalObject.LogLevel)
 	}
 	// --------------------------------------------init log end
+}
+
+func XingoTry(f reflect.Value, args []reflect.Value,handler func(interface{})) {
+	defer func() {
+		if err := recover(); err != nil {
+			logger.Info("-------------panic recover---------------")
+			if handler != nil{
+				handler(err)
+			}
+		}
+	}()
+	f.Call(args)
 }

@@ -9,7 +9,6 @@ import (
 	"github.com/viphxin/xingo/utils"
 	"math/rand"
 	"reflect"
-	"runtime/debug"
 	"strconv"
 	"strings"
 	"time"
@@ -85,26 +84,18 @@ func (this *MsgHandle) InitWorkerPool(poolSize int) {
 		go func(index int, taskQueue chan *PkgAll) {
 			logger.Info(fmt.Sprintf("init thread pool %d.", index))
 			for {
-				defer func() {
-					if err := recover(); err != nil {
-						debug.PrintStack()
-						logger.Info("===================panic recover===============")
-					}
-				}()
-				for {
-					data := <-taskQueue
-					//can goroutine?
-					if f, ok := MsgHandleObj.Apis[data.Pdata.MsgId]; ok {
-						//存在
-						st := time.Now()
-						f.Call([]reflect.Value{reflect.ValueOf(data)})
-						logger.Debug(fmt.Sprintf("Api_%d cost total time: %f ms", data.Pdata.MsgId, time.Now().Sub(st).Seconds()*1000))
-					} else {
-						logger.Error(fmt.Sprintf("not found api:  %d", data.Pdata.MsgId))
-					}
+				data := <-taskQueue
+				//can goroutine?
+				if f, ok := MsgHandleObj.Apis[data.Pdata.MsgId]; ok {
+					//存在
+					st := time.Now()
+					//f.Call([]reflect.Value{reflect.ValueOf(data)})
+					utils.XingoTry(f, []reflect.Value{reflect.ValueOf(data)}, nil)
+					logger.Debug(fmt.Sprintf("Api_%d cost total time: %f ms", data.Pdata.MsgId, time.Now().Sub(st).Seconds()*1000))
+				} else {
+					logger.Error(fmt.Sprintf("not found api:  %d", data.Pdata.MsgId))
 				}
 			}
-
 		}(i, c)
 	}
 }
