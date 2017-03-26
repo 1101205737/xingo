@@ -2,13 +2,13 @@ package fnet
 
 import (
 	"errors"
+	"fmt"
+	"github.com/viphxin/xingo/iface"
 	"github.com/viphxin/xingo/logger"
+	"github.com/viphxin/xingo/utils"
 	"net"
 	"sync"
 	"time"
-	"github.com/viphxin/xingo/iface"
-	"github.com/viphxin/xingo/utils"
-	"fmt"
 )
 
 type Connection struct {
@@ -18,7 +18,6 @@ type Connection struct {
 	Protoc       iface.IServerProtocol
 	PropertyBag  map[string]interface{}
 	sendtagGuard sync.RWMutex
-	propertyLock sync.RWMutex
 
 	SendBuffChan chan []byte
 	ExtSendChan  chan bool
@@ -26,11 +25,11 @@ type Connection struct {
 
 func NewConnection(conn *net.TCPConn, sessionId uint32, protoc iface.IServerProtocol) *Connection {
 	fconn := &Connection{
-		Conn:        conn,
-		isClosed:    false,
-		SessionId:   sessionId,
-		Protoc:      protoc,
-		PropertyBag: make(map[string]interface{}),
+		Conn:         conn,
+		isClosed:     false,
+		SessionId:    sessionId,
+		Protoc:       protoc,
+		PropertyBag:  make(map[string]interface{}),
 		SendBuffChan: make(chan []byte, utils.GlobalObject.MaxSendChanLen),
 		ExtSendChan:  make(chan bool, 1),
 	}
@@ -41,8 +40,12 @@ func NewConnection(conn *net.TCPConn, sessionId uint32, protoc iface.IServerProt
 
 func (this *Connection) Start() {
 	//add to connectionmsg
-	ConnectionManager.Add(this)
-	this.Protoc.OnConnectionMade(this)
+	//放到主逻辑线程处理
+	//ConnectionManager.Add(this)
+	this.Protoc.GetMsgHandle().DoConnection(&ConnectionQueueMsg{
+		ConnType: CONNECTIONIN,
+		Conn:     this,
+	})
 	this.StartWriteThread()
 	this.Protoc.StartReadThread(this)
 }
@@ -54,10 +57,12 @@ func (this *Connection) Stop() {
 
 	this.ExtSendChan <- true
 	this.isClosed = true
-	//掉线回调放到go内防止，掉线回调处理出线死锁
-	go this.Protoc.OnConnectionLost(this)
-	//remove to connectionmsg
-	ConnectionManager.Remove(this)
+	//remove to connectionmsg 放到主逻辑线程处理
+	//ConnectionManager.Remove(this)
+	this.Protoc.GetMsgHandle().DoConnection(&ConnectionQueueMsg{
+		ConnType: CONNECTIONOUT,
+		Conn:     this,
+	})
 	close(this.ExtSendChan)
 	close(this.SendBuffChan)
 }
@@ -75,9 +80,6 @@ func (this *Connection) GetProtoc() iface.IServerProtocol {
 }
 
 func (this *Connection) GetProperty(key string) (interface{}, error) {
-	this.propertyLock.RLock()
-	defer this.propertyLock.RUnlock()
-
 	value, ok := this.PropertyBag[key]
 	if ok {
 		return value, nil
@@ -87,16 +89,10 @@ func (this *Connection) GetProperty(key string) (interface{}, error) {
 }
 
 func (this *Connection) SetProperty(key string, value interface{}) {
-	this.propertyLock.Lock()
-	defer this.propertyLock.Unlock()
-
 	this.PropertyBag[key] = value
 }
 
 func (this *Connection) RemoveProperty(key string) {
-	this.propertyLock.Lock()
-	defer this.propertyLock.Unlock()
-
 	delete(this.PropertyBag, key)
 }
 
@@ -165,4 +161,3 @@ func (this *Connection) StartWriteThread() {
 		}
 	}()
 }
-

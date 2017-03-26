@@ -17,21 +17,33 @@ var (
 	packageTooBig = errors.New("Too many data to receive!!")
 )
 
-
 type PkgAll struct {
 	Pdata *PkgData
 	Fconn iface.Iconnection
 }
 
 type Protocol struct {
+	pbdatapack   *PBDataPack
+	msgHandleObj *MsgHandle
 }
 
-func (this *Protocol)AddRpcRouter(router interface{}){
-	MsgHandleObj.AddRouter(router)
+func NewProtocol() *Protocol {
+	return &Protocol{
+		pbdatapack:   &PBDataPack{},
+		msgHandleObj: NewMsgHandle(),
+	}
 }
 
-func (this *Protocol) InitWorker(poolsize int32){
-	MsgHandleObj.InitWorkerPool(int(poolsize))
+func (this *Protocol) GetMsgHandle() iface.Imsghandle {
+	return this.msgHandleObj
+}
+
+func (this *Protocol) GetDataPack() iface.Idatapack {
+	return this.pbdatapack
+}
+
+func (this *Protocol) AddRpcRouter(router interface{}) {
+	this.msgHandleObj.AddRouter(router)
 }
 
 func (this *Protocol) OnConnectionMade(fconn iface.Iconnection) {
@@ -44,44 +56,36 @@ func (this *Protocol) OnConnectionLost(fconn iface.Iconnection) {
 	utils.GlobalObject.OnClosed(fconn)
 }
 
-
 func (this *Protocol) StartReadThread(fconn iface.Iconnection) {
 	logger.Info("start receive data from socket...")
 	for {
 		//read per head data
-		headdata := make([]byte, DefaultDataPack.GetHeadLen())
+		headdata := make([]byte, this.pbdatapack.GetHeadLen())
 
 		if _, err := io.ReadFull(fconn.GetConnection(), headdata); err != nil {
 			logger.Error(err)
 			fconn.Stop()
 			return
 		}
-		pkgHead, err := DefaultDataPack.Unpack(headdata)
+		pkgHead, err := this.pbdatapack.Unpack(headdata)
 		if err != nil {
 			fconn.Stop()
 			return
 		}
 		//data
-		if pkgHead.Len > 0 {
-			pkgHead.Data = make([]byte, pkgHead.Len)
-			if _, err := io.ReadFull(fconn.GetConnection(), pkgHead.Data); err != nil {
+		pkg := pkgHead.(*PkgData)
+		if pkg.Len > 0 {
+			pkg.Data = make([]byte, pkg.Len)
+			if _, err := io.ReadFull(fconn.GetConnection(), pkg.Data); err != nil {
 				fconn.Stop()
 				return
 			}
 		}
 
-		logger.Debug(fmt.Sprintf("msg id :%d, data len: %d", pkgHead.MsgId, pkgHead.Len))
-		if utils.GlobalObject.IsUsePool{
-			MsgHandleObj.DoMsg(&PkgAll{
-				Pdata: pkgHead,
-				Fconn: fconn,
-			})
-		}else{
-			MsgHandleObj.DoMsg2(&PkgAll{
-				Pdata: pkgHead,
-				Fconn: fconn,
-			})
-		}
-
+		logger.Debug(fmt.Sprintf("msg id :%d, data len: %d", pkg.MsgId, pkg.Len))
+		this.msgHandleObj.DeliverToMsgQueue(&PkgAll{
+			Pdata: pkg,
+			Fconn: fconn,
+		})
 	}
 }

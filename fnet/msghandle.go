@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"github.com/viphxin/xingo/logger"
 	"github.com/viphxin/xingo/utils"
-	"math/rand"
 	"reflect"
 	"strconv"
 	"strings"
@@ -15,39 +14,52 @@ import (
 )
 
 type MsgHandle struct {
-	PoolSize  int32
-	TaskQueue []chan *PkgAll
+	//TaskQueue chan *PkgAll
+	TaskQueue chan interface{}
 	Apis      map[uint32]reflect.Value
 }
 
-var MsgHandleObj *MsgHandle
-
-func init() {
-	MsgHandleObj = &MsgHandle{
-		PoolSize:  utils.GlobalObject.PoolSize,
-		TaskQueue: make([]chan *PkgAll, utils.GlobalObject.PoolSize),
+func NewMsgHandle() *MsgHandle {
+	return &MsgHandle{
+		TaskQueue: make(chan interface{}, utils.GlobalObject.MaxWorkerLen),
 		Apis:      make(map[uint32]reflect.Value),
 	}
 }
 
-func (this *MsgHandle) DoMsg(data *PkgAll) {
-	index := rand.Int31n(utils.GlobalObject.PoolSize)
-	taskQueue := this.TaskQueue[index]
-	logger.Debug(fmt.Sprintf("add to pool : %d", index))
-	taskQueue <- data
+func (this *MsgHandle) GetTaskQueue() chan interface{} {
+	return this.TaskQueue
 }
 
-func (this *MsgHandle) DoMsg2(data *PkgAll) {
-	go func() {
-		if f, ok := MsgHandleObj.Apis[data.Pdata.MsgId]; ok {
-			//存在
-			st := time.Now()
-			f.Call([]reflect.Value{reflect.ValueOf(data)})
-			logger.Debug(fmt.Sprintf("Api_%d cost total time: %f ms", data.Pdata.MsgId, time.Now().Sub(st).Seconds()*1000))
-		} else {
-			logger.Error(fmt.Sprintf("not found api:  %d", data.Pdata.MsgId))
-		}
-	}()
+func (this *MsgHandle) DeliverToMsgQueue(data interface{}) {
+	logger.Debug("add to msg queue")
+	this.TaskQueue <- data.(*PkgAll)
+}
+
+func (this *MsgHandle) DeliverToConnectionQueue(data interface{}) {
+	logger.Debug("add to connection queue")
+	utils.GlobalObject.TcpServer.GetConnectionQueue() <- data
+}
+
+func (this *MsgHandle) DoMsg(data interface{}) {
+	pkg := data.(*PkgAll)
+	if f, ok := this.Apis[pkg.Pdata.MsgId]; ok {
+		//存在
+		st := time.Now()
+		//f.Call([]reflect.Value{reflect.ValueOf(data)})
+		utils.XingoTry(f, []reflect.Value{reflect.ValueOf(data)}, nil)
+		logger.Debug(fmt.Sprintf("Api_%d cost total time: %f ms", pkg.Pdata.MsgId, time.Now().Sub(st).Seconds()*1000))
+	} else {
+		logger.Error(fmt.Sprintf("not found api:  %d", pkg.Pdata.MsgId))
+	}
+}
+
+func (this *MsgHandle) DoConnection(data interface{}) {
+	pkg := data.(*ConnectionQueueMsg)
+	if pkg.ConnType == CONNECTIONIN {
+		utils.GlobalObject.TcpServer.GetConnectionMgr().Add(pkg.Conn)
+	} else {
+		utils.GlobalObject.TcpServer.GetConnectionMgr().Remove(pkg.Conn)
+	}
 }
 
 func (this *MsgHandle) AddRouter(router interface{}) {
@@ -77,25 +89,22 @@ func (this *MsgHandle) AddRouter(router interface{}) {
 	// this.Apis[2].Call([]reflect.Value{reflect.ValueOf(&PkgAll{})})
 }
 
-func (this *MsgHandle) InitWorkerPool(poolSize int) {
-	for i := 0; i < poolSize; i += 1 {
-		c := make(chan *PkgAll, utils.GlobalObject.MaxWorkerLen)
-		MsgHandleObj.TaskQueue[i] = c
-		go func(index int, taskQueue chan *PkgAll) {
-			logger.Info(fmt.Sprintf("init thread pool %d.", index))
-			for {
-				data := <-taskQueue
-				//can goroutine?
-				if f, ok := MsgHandleObj.Apis[data.Pdata.MsgId]; ok {
-					//存在
-					st := time.Now()
-					//f.Call([]reflect.Value{reflect.ValueOf(data)})
-					utils.XingoTry(f, []reflect.Value{reflect.ValueOf(data)}, nil)
-					logger.Debug(fmt.Sprintf("Api_%d cost total time: %f ms", data.Pdata.MsgId, time.Now().Sub(st).Seconds()*1000))
-				} else {
-					logger.Error(fmt.Sprintf("not found api:  %d", data.Pdata.MsgId))
-				}
-			}
-		}(i, c)
+/*
+开启逻辑主线程
+*/
+func (this *MsgHandle) StartWorkerLoop() {
+	logger.Info("init main logic thread.")
+	for {
+		select {
+		case apiData := <-this.TaskQueue:
+			this.DoMsg(apiData)
+			continue
+		case connectionData := <-utils.GlobalObject.TcpServer.GetConnectionQueue():
+			this.DoConnection(connectionData)
+			continue
+		case delayTask := <-utils.GlobalObject.GsTimeScheduel.GetTriggerChannel():
+			delayTask.Call()
+			continue
+		}
 	}
 }

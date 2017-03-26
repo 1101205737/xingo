@@ -16,4 +16,5 @@ type Iconnection interface {
 	GetProperty(string) (interface{}, error)
 	SetProperty(string, interface{})
 	RemoveProperty(string)
+	GetProtoc() IServerProtocol
 }

@@ -1,51 +1,46 @@
 package cluster
 
 import (
-	"encoding/binary"
-	"fmt"
 	"bytes"
-	"github.com/viphxin/xingo/fnet"
-	"errors"
+	"encoding/binary"
 	"encoding/json"
+	"errors"
+	"fmt"
+	"github.com/viphxin/xingo/fnet"
 	"github.com/viphxin/xingo/iface"
 )
 
 type RpcData struct {
-	MsgType RpcSignal `json:"msgtype"`
-	Key string `json:"key,omitempty"`
-	Target string `json:"target,omitempty"`
-	Args []interface{} `json:"args,omitempty"`
-	Result map[string]interface{} `json:"result,omitempty"`
+	MsgType RpcSignal              `json:"msgtype"`
+	Key     string                 `json:"key,omitempty"`
+	Target  string                 `json:"target,omitempty"`
+	Args    []interface{}          `json:"args,omitempty"`
+	Result  map[string]interface{} `json:"result,omitempty"`
 }
 
-
 type RpcPackege struct {
-	Len int32
+	Len  int32
 	Data []byte
 }
 
 type RpcRequest struct {
-	Fconn iface.IWriter
+	Fconn   iface.IWriter
 	Rpcdata *RpcData
 }
 
-type RpcDataPack struct {
+type RpcDataPack struct{}
 
-}
-
-var DefaultRpcDataPack *RpcDataPack = &RpcDataPack{}
-
-func (this *RpcDataPack)GetHeadLen() int32{
+func (this *RpcDataPack) GetHeadLen() int32 {
 	return 4
 }
 
-func (this *RpcDataPack)Unpack(headdata []byte) (rp *RpcPackege, err error) {
+func (this *RpcDataPack) Unpack(headdata []byte) (interface{}, error) {
 	headbuf := bytes.NewReader(headdata)
 
-	rp = &RpcPackege{}
+	rp := &RpcPackege{}
 
 	// 读取Len
-	if err = binary.Read(headbuf, binary.LittleEndian, &rp.Len); err != nil {
+	if err := binary.Read(headbuf, binary.LittleEndian, &rp.Len); err != nil {
 		return nil, err
 	}
 
@@ -57,12 +52,12 @@ func (this *RpcDataPack)Unpack(headdata []byte) (rp *RpcPackege, err error) {
 	return rp, nil
 }
 
-func (this *RpcDataPack)Pack(data *RpcData) (out []byte, err error) {
+func (this *RpcDataPack) Pack(msgid uint32, data interface{}) (out []byte, err error) {
 	outbuff := bytes.NewBuffer([]byte{})
 	// 进行编码
 	dataBytes := []byte{}
 	if data != nil {
-		dataBytes, err = json.Marshal(data)
+		dataBytes, err = json.Marshal(data.(*RpcData))
 	}
 
 	if err != nil {
@@ -72,7 +67,6 @@ func (this *RpcDataPack)Pack(data *RpcData) (out []byte, err error) {
 	if err = binary.Write(outbuff, binary.LittleEndian, uint32(len(dataBytes))); err != nil {
 		return
 	}
-
 
 	//all pkg data
 	if err = binary.Write(outbuff, binary.LittleEndian, dataBytes); err != nil {

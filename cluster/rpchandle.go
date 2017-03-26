@@ -1,79 +1,88 @@
 package cluster
+
 /*
 	regest rpc
 */
 import (
 	"fmt"
+	"github.com/viphxin/xingo/fnet"
 	"github.com/viphxin/xingo/logger"
 	"github.com/viphxin/xingo/utils"
-	"math/rand"
 	"reflect"
-	"runtime/debug"
 	"time"
 )
 
 type RpcMsgHandle struct {
-	PoolSize  int32
-	TaskQueue []chan *RpcRequest
+	//TaskQueue chan *RpcRequest
+	TaskQueue chan interface{}
 	Apis      map[string]reflect.Value
 }
 
-var RpcHandleObj *RpcMsgHandle
-
-func init() {
-	RpcHandleObj = &RpcMsgHandle{
-		PoolSize:  utils.GlobalObject.PoolSize,
-		TaskQueue: make([]chan *RpcRequest, utils.GlobalObject.PoolSize),
+func NewRpcMsgHandle() *RpcMsgHandle {
+	return &RpcMsgHandle{
+		TaskQueue: make(chan interface{}, utils.GlobalObject.MaxWorkerLen),
 		Apis:      make(map[string]reflect.Value),
 	}
+}
+
+func (this *RpcMsgHandle) GetTaskQueue() chan interface{} {
+	return this.TaskQueue
 }
 
 /*
 处理rpc消息
 */
-func (this *RpcMsgHandle) DoMsg(request *RpcRequest) {
-	if request.Rpcdata.MsgType == RESPONSE &&request.Rpcdata.Key != ""{
+func (this *RpcMsgHandle) DoMsg(request interface{}) {
+	rpcrequest := request.(*RpcRequest)
+	if rpcrequest.Rpcdata.MsgType == RESPONSE && rpcrequest.Rpcdata.Key != "" {
 		//放回异步结果
-		AResultGlobalObj.FillAsyncResult(request.Rpcdata.Key, request.Rpcdata)
+		AResultGlobalObj.FillAsyncResult(rpcrequest.Rpcdata.Key, rpcrequest.Rpcdata)
 		return
-	}else{
+	} else {
 		//rpc 请求
-		if f, ok := RpcHandleObj.Apis[request.Rpcdata.Target]; ok {
+		if f, ok := this.Apis[rpcrequest.Rpcdata.Target]; ok {
 			//存在
 			st := time.Now()
-			if request.Rpcdata.MsgType == REQUEST_FORRESULT{
+			if rpcrequest.Rpcdata.MsgType == REQUEST_FORRESULT {
 				ret := f.Call([]reflect.Value{reflect.ValueOf(request)})
-				packdata, err := DefaultRpcDataPack.Pack(&RpcData{
+				packdata, err := utils.GlobalObject.RpcSProtoc.GetDataPack().Pack(0, &RpcData{
 					MsgType: RESPONSE,
-					Result: ret[0].Interface().(map[string]interface{}),
-					Key: request.Rpcdata.Key,
+					Result:  ret[0].Interface().(map[string]interface{}),
+					Key:     rpcrequest.Rpcdata.Key,
 				})
-				if err == nil{
-					request.Fconn.Send(packdata)
-				}else{
+				if err == nil {
+					rpcrequest.Fconn.Send(packdata)
+				} else {
 					logger.Error(err)
 				}
-			}else if request.Rpcdata.MsgType == REQUEST_NORESULT{
+			} else if rpcrequest.Rpcdata.MsgType == REQUEST_NORESULT {
 				f.Call([]reflect.Value{reflect.ValueOf(request)})
 			}
 
-			logger.Debug(fmt.Sprintf("rpc %s cost total time: %f ms", request.Rpcdata.Target, time.Now().Sub(st).Seconds()*1000))
+			logger.Debug(fmt.Sprintf("rpc %s cost total time: %f ms", rpcrequest.Rpcdata.Target, time.Now().Sub(st).Seconds()*1000))
 		} else {
-			logger.Error(fmt.Sprintf("not found rpc:  %s", request.Rpcdata.Target))
+			logger.Error(fmt.Sprintf("not found rpc:  %s", rpcrequest.Rpcdata.Target))
 		}
 	}
 }
 
-func (this *RpcMsgHandle) DoMsg1(request *RpcRequest) {
-	//add to worker pool
-	index := rand.Int31n(utils.GlobalObject.PoolSize)
-	taskQueue := this.TaskQueue[index]
-	logger.Debug(fmt.Sprintf("add to rpc pool : %d", index))
-	taskQueue <- request
+func (this *RpcMsgHandle) DoConnection(data interface{}) {
+	pkg := data.(*fnet.ConnectionQueueMsg)
+	if pkg.ConnType == fnet.CONNECTIONIN {
+		utils.GlobalObject.TcpServer.GetConnectionMgr().Add(pkg.Conn)
+	} else {
+		utils.GlobalObject.TcpServer.GetConnectionMgr().Remove(pkg.Conn)
+	}
 }
 
-func (this *RpcMsgHandle) DoMsg2(request *RpcRequest) {
-	go this.DoMsg(request)
+func (this *RpcMsgHandle) DeliverToMsgQueue(request interface{}) {
+	logger.Debug("add to rpc worker.")
+	this.TaskQueue <- request
+}
+
+func (this *RpcMsgHandle) DeliverToConnectionQueue(data interface{}) {
+	logger.Debug("add to connection queue")
+	utils.GlobalObject.TcpServer.GetConnectionQueue() <- data
 }
 
 func (this *RpcMsgHandle) AddRouter(router interface{}) {
@@ -91,26 +100,47 @@ func (this *RpcMsgHandle) AddRouter(router interface{}) {
 	}
 }
 
-func (this *RpcMsgHandle) InitWorkerPool(poolSize int) {
-	for i := 0; i < poolSize; i += 1 {
-		c := make(chan *RpcRequest, utils.GlobalObject.MaxWorkerLen)
-		RpcHandleObj.TaskQueue[i] = c
-		go func(index int, taskQueue chan *RpcRequest) {
-			logger.Info(fmt.Sprintf("init rpc thread pool %d.", index))
-			for {
-				defer func() {
-					if err := recover(); err != nil {
-						debug.PrintStack()
-						logger.Info("===================rpc call panic recover===============")
-					}
-				}()
-				for {
-					request := <-taskQueue
-					this.DoMsg(request)
+/*
+开启逻辑主线程
+*/
+func (this *RpcMsgHandle) StartWorkerLoop() {
+	logger.Info("init cluster main logic thread.")
+	//根节点或者网关
+	tcpserver := utils.GlobalObject.TcpServer
+	protoc := utils.GlobalObject.Protoc
+	if tcpserver != nil {
+		for {
+			select {
+			case rpcData := <-this.TaskQueue:
+				this.DoMsg(rpcData)
+				continue
+			case apiData := <-protoc.GetMsgHandle().GetTaskQueue():
+				if utils.GlobalObject.RpcSProtoc == nil {
+					//网关
+					protoc.GetMsgHandle().DoMsg(apiData)
+				} else {
+					//内部节点
+					this.DoMsg(apiData)
 				}
+				continue
+			case connectionData := <-tcpserver.GetConnectionQueue():
+				protoc.GetMsgHandle().DoConnection(connectionData)
+				continue
+			case delayTask := <-utils.GlobalObject.GsTimeScheduel.GetTriggerChannel():
+				delayTask.Call()
+				continue
 			}
-
-		}(i, c)
+		}
+	} else {
+		for {
+			select {
+			case rpcData := <-this.TaskQueue:
+				this.DoMsg(rpcData)
+				continue
+			case delayTask := <-utils.GlobalObject.GsTimeScheduel.GetTriggerChannel():
+				delayTask.Call()
+				continue
+			}
+		}
 	}
 }
-
