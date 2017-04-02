@@ -48,6 +48,7 @@ func (this *Server) handleConnection(conn *net.TCPConn) {
 
 func (this *Server) Start() {
 	go func() {
+		utils.GlobalObject.Protoc.InitWorker(utils.GlobalObject.PoolSize)
 		ln, err := net.ListenTCP("tcp", &net.TCPAddr{
 			Port: this.Port,
 		})
@@ -135,6 +136,5 @@ func (this *Server) WaitSignal() {
 
 func (this *Server) Serve() {
 	this.Start()
-	go utils.GlobalObject.Protoc.InitWorker(utils.GlobalObject.PoolSize)
 	this.WaitSignal()
 }

@@ -64,6 +64,7 @@ func ReConnectMasterCB(fconn iface.Iclient) {
 }
 
 func NewClusterServer(name, path string) *ClusterServer {
+	logger.SetPrefix(fmt.Sprintf("[%s]", strings.ToUpper(name)))
 	cconf, err := cluster.NewClusterConf(path)
 	if err != nil {
 		panic("cluster conf error!!!")

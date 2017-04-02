@@ -1,6 +1,7 @@
 package clusterserver
 
 import (
+	"fmt"
 	"github.com/viphxin/xingo/cluster"
 	"github.com/viphxin/xingo/fserver"
 	"github.com/viphxin/xingo/iface"
@@ -17,6 +18,7 @@ type Master struct {
 }
 
 func NewMaster(path string) *Master {
+	logger.SetPrefix(fmt.Sprintf("[%s]", "MASTER"))
 	cconf, err := cluster.NewClusterConf(path)
 	if err != nil {
 		panic("cluster conf error!!!")

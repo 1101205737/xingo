@@ -1,4 +1,5 @@
 package logger
+
 /*
 https://github.com/donnie4w
 */
@@ -49,7 +50,7 @@ const (
 )
 
 const (
-	_       = iota
+	_ = iota
 	ROLLINGDAILY
 	ROLLINGFILE
 )
@@ -63,6 +64,10 @@ type _FILE struct {
 	mu       *sync.RWMutex
 	logfile  *os.File
 	lg       *log.Logger
+}
+
+func SetPrefix(title string) {
+	log.SetPrefix(title)
 }
 
 func SetConsole(isConsole bool) {
