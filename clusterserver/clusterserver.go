@@ -59,7 +59,7 @@ func ReConnectMasterCB(fconn iface.Iclient) {
 			}
 		}
 	} else {
-		panic(fmt.Sprintf("connected to master error: %s", err))
+		panic(fmt.Sprintf("reconnected to master error: %s", err))
 	}
 }
 

@@ -67,8 +67,11 @@ func (this *TcpClient) Stop(isforce bool) {
 		this.protoc.OnConnectionLost(this)
 	} else {
 		//retry
-		if this.ReConnection() && this.reconnCB != nil {
-			this.reconnCB(this)
+		if this.ReConnection() {
+			if this.reconnCB != nil {
+				this.reconnCB(this)
+			}
+			this.Start()
 		}
 	}
 }
