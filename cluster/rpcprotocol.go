@@ -127,12 +127,12 @@ func (this *RpcClientProtocol) StartReadThread(fconn iface.Iclient) {
 
 		if _, err := io.ReadFull(fconn.GetConnection(), headdata); err != nil {
 			logger.Error(err)
-			fconn.Stop()
+			fconn.Stop(false)
 			return
 		}
 		pkgHead, err := this.rpcdatapack.Unpack(headdata)
 		if err != nil {
-			fconn.Stop()
+			fconn.Stop(false)
 			return
 		}
 		//data
@@ -140,7 +140,7 @@ func (this *RpcClientProtocol) StartReadThread(fconn iface.Iclient) {
 		if pkg.Len > 0 {
 			pkg.Data = make([]byte, pkg.Len)
 			if _, err := io.ReadFull(fconn.GetConnection(), pkg.Data); err != nil {
-				fconn.Stop()
+				fconn.Stop(false)
 				return
 			} else {
 				rpcRequest := &RpcRequest{
@@ -150,7 +150,7 @@ func (this *RpcClientProtocol) StartReadThread(fconn iface.Iclient) {
 				err = json.Unmarshal(pkg.Data, rpcRequest.Rpcdata)
 				if err != nil {
 					logger.Error("json.Unmarshal error!!!")
-					fconn.Stop()
+					fconn.Stop(false)
 					return
 				}
 

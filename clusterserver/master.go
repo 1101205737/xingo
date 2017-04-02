@@ -1,6 +1,7 @@
 package clusterserver
 
 import (
+	"fmt"
 	"github.com/viphxin/xingo/cluster"
 	"github.com/viphxin/xingo/fserver"
 	"github.com/viphxin/xingo/iface"
@@ -19,7 +20,7 @@ type Master struct {
 }
 
 func NewMaster(path string) *Master {
-	logger.SetPrefix("[master]")
+	logger.SetPrefix("[MASTER]")
 	cconf, err := cluster.NewClusterConf(path)
 	if err != nil {
 		panic("cluster conf error!!!")
@@ -61,7 +62,7 @@ func (this *Master) WaitSignal() {
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt, os.Kill)
 	sig := <-c
-	logger.Info("=======", sig)
+	logger.Info(fmt.Sprintf("signal catch: [%s]", sig))
 }
 
 func (this *Master) StartMaster() {

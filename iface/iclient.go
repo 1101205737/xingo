@@ -4,7 +4,7 @@ import "net"
 
 type Iclient interface {
 	Start()
-	Stop()
+	Stop(bool)
 	GetConnection() *net.TCPConn
 	Send([]byte) error
 	GetProperty(string) (interface{}, error)

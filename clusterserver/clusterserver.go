@@ -47,8 +47,24 @@ func DoCCConnectionLost(fconn iface.Iclient) {
 	}
 }
 
+//reconnected to master
+func ReConnectMasterCB(fconn iface.Iclient) {
+	rpc := cluster.NewChild(utils.GlobalObject.Name, GlobalClusterServer.MasterObj)
+	response, err := rpc.CallChildForResult("TakeProxy", utils.GlobalObject.Name)
+	if err == nil {
+		roots, ok := response.Result["roots"]
+		if ok {
+			for _, root := range roots.([]interface{}) {
+				GlobalClusterServer.ConnectToRemote(root.(string))
+			}
+		}
+	} else {
+		panic(fmt.Sprintf("reconnected to master error: %s", err))
+	}
+}
+
 func NewClusterServer(name, path string) *ClusterServer {
-	logger.SetPrefix(fmt.Sprintf("[xingo_cluster %s]", name))
+	logger.SetPrefix(fmt.Sprintf("[%s]", strings.ToUpper(name)))
 	cconf, err := cluster.NewClusterConf(path)
 	if err != nil {
 		panic("cluster conf error!!!")
@@ -150,18 +166,24 @@ func (this *ClusterServer) StartClusterServer() {
 
 	logger.Info("xingo cluster start success.")
 	// close
-	c := make(chan os.Signal, 1)
-	signal.Notify(c, os.Interrupt, os.Kill)
-	<-c
-	this.MasterObj.Stop()
+	this.WaitSignal()
+	this.MasterObj.Stop(true)
 	if this.RootServer != nil {
 		this.RootServer.Stop()
 	}
 	logger.Info("xingo cluster stoped.")
 }
 
+func (this *ClusterServer) WaitSignal() {
+	// close
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt, os.Kill)
+	sig := <-c
+	logger.Info(fmt.Sprintf("signal catch: [%s]", sig))
+}
+
 func (this *ClusterServer) ConnectToMaster() {
-	master := fnet.NewTcpClient(this.Cconf.Master.Host, this.Cconf.Master.RootPort, utils.GlobalObject.RpcCProtoc)
+	master := fnet.NewReConnTcpClient(this.Cconf.Master.Host, this.Cconf.Master.RootPort, utils.GlobalObject.RpcCProtoc, 1024, 60, ReConnectMasterCB)
 	this.MasterObj = master
 	master.Start()
 	//注册到master
@@ -182,14 +204,19 @@ func (this *ClusterServer) ConnectToMaster() {
 func (this *ClusterServer) ConnectToRemote(rname string) {
 	rserverconf, ok := this.Cconf.Servers[rname]
 	if ok {
-		rserver := fnet.NewTcpClient(rserverconf.Host, rserverconf.RootPort, utils.GlobalObject.RpcCProtoc)
-		this.RemoteNodesMgr.AddChild(rname, rserver)
-		rserver.Start()
-		rserver.SetProperty("remote", rname)
-		//takeproxy
-		child, err := this.RemoteNodesMgr.GetChild(rname)
-		if err == nil {
-			child.CallChildNotForResult("TakeProxy", utils.GlobalObject.Name)
+		//处理master掉线，重新通知的情况
+		if _, err := this.GetRemote(rname); err != nil {
+			rserver := fnet.NewTcpClient(rserverconf.Host, rserverconf.RootPort, utils.GlobalObject.RpcCProtoc)
+			this.RemoteNodesMgr.AddChild(rname, rserver)
+			rserver.Start()
+			rserver.SetProperty("remote", rname)
+			//takeproxy
+			child, err := this.RemoteNodesMgr.GetChild(rname)
+			if err == nil {
+				child.CallChildNotForResult("TakeProxy", utils.GlobalObject.Name)
+			}
+		} else {
+			logger.Info("Remote connection already exist!")
 		}
 	} else {
 		//未找到节点
@@ -240,6 +267,13 @@ func (this *ClusterServer) RemoveRemote(name string) {
 	defer this.Unlock()
 
 	this.RemoteNodesMgr.RemoveChild(name)
+}
+
+func (this *ClusterServer) GetRemote(name string) (*cluster.Child, error) {
+	this.RLock()
+	defer this.RUnlock()
+
+	return this.RemoteNodesMgr.GetChild(name)
 }
 
 /*
