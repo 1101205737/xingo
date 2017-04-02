@@ -13,6 +13,9 @@ type Iconnection interface {
 	SendBuff([]byte) error
 	RemoteAddr() net.Addr
 	LostConnection()
+	GetSysProperty(string) (interface{}, error)
+	SetSysProperty(string, interface{})
+	RemoveSysProperty(string)
 	GetProperty(string) (interface{}, error)
 	SetProperty(string, interface{})
 	RemoveProperty(string)

@@ -64,12 +64,7 @@ func (this *Server) Start() {
 			if err != nil {
 				logger.Error(err)
 			}
-			//max client exceed
-			if this.GetConnectionMgr().Len() >= utils.GlobalObject.MaxConn {
-				conn.Close()
-			} else {
-				go this.handleConnection(conn)
-			}
+			go this.handleConnection(conn)
 		}
 	}()
 }

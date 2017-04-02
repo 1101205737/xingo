@@ -12,12 +12,13 @@ import (
 )
 
 type Connection struct {
-	Conn         *net.TCPConn
-	isClosed     bool
-	SessionId    uint32
-	Protoc       iface.IServerProtocol
-	PropertyBag  map[string]interface{}
-	sendtagGuard sync.RWMutex
+	Conn           *net.TCPConn
+	isClosed       bool
+	SessionId      uint32
+	Protoc         iface.IServerProtocol
+	PropertyBag    map[string]interface{}
+	SysPropertyBag map[string]interface{}
+	sendtagGuard   sync.RWMutex
 
 	SendBuffChan chan []byte
 	ExtSendChan  chan bool
@@ -25,16 +26,16 @@ type Connection struct {
 
 func NewConnection(conn *net.TCPConn, sessionId uint32, protoc iface.IServerProtocol) *Connection {
 	fconn := &Connection{
-		Conn:         conn,
-		isClosed:     false,
-		SessionId:    sessionId,
-		Protoc:       protoc,
-		PropertyBag:  make(map[string]interface{}),
-		SendBuffChan: make(chan []byte, utils.GlobalObject.MaxSendChanLen),
-		ExtSendChan:  make(chan bool, 1),
+		Conn:           conn,
+		isClosed:       false,
+		SessionId:      sessionId,
+		Protoc:         protoc,
+		PropertyBag:    make(map[string]interface{}),
+		SysPropertyBag: make(map[string]interface{}),
+		SendBuffChan:   make(chan []byte, utils.GlobalObject.MaxSendChanLen),
+		ExtSendChan:    make(chan bool, 1),
 	}
-	//set  connection time
-	fconn.SetProperty("ctime", time.Since(time.Now()))
+
 	return fconn
 }
 
@@ -42,7 +43,7 @@ func (this *Connection) Start() {
 	//add to connectionmsg
 	//放到主逻辑线程处理
 	//ConnectionManager.Add(this)
-	this.Protoc.GetMsgHandle().DoConnection(&ConnectionQueueMsg{
+	this.Protoc.GetMsgHandle().DeliverToConnectionQueue(&ConnectionQueueMsg{
 		ConnType: CONNECTIONIN,
 		Conn:     this,
 	})
@@ -59,7 +60,7 @@ func (this *Connection) Stop() {
 	this.isClosed = true
 	//remove to connectionmsg 放到主逻辑线程处理
 	//ConnectionManager.Remove(this)
-	this.Protoc.GetMsgHandle().DoConnection(&ConnectionQueueMsg{
+	this.Protoc.GetMsgHandle().DeliverToConnectionQueue(&ConnectionQueueMsg{
 		ConnType: CONNECTIONOUT,
 		Conn:     this,
 	})
@@ -80,6 +81,7 @@ func (this *Connection) GetProtoc() iface.IServerProtocol {
 }
 
 func (this *Connection) GetProperty(key string) (interface{}, error) {
+
 	value, ok := this.PropertyBag[key]
 	if ok {
 		return value, nil
@@ -94,6 +96,24 @@ func (this *Connection) SetProperty(key string, value interface{}) {
 
 func (this *Connection) RemoveProperty(key string) {
 	delete(this.PropertyBag, key)
+}
+
+func (this *Connection) GetSysProperty(key string) (interface{}, error) {
+
+	value, ok := this.SysPropertyBag[key]
+	if ok {
+		return value, nil
+	} else {
+		return nil, errors.New("no sys property in connection")
+	}
+}
+
+func (this *Connection) SetSysProperty(key string, value interface{}) {
+	this.SysPropertyBag[key] = value
+}
+
+func (this *Connection) RemoveSysProperty(key string) {
+	delete(this.SysPropertyBag, key)
 }
 
 func (this *Connection) Send(data []byte) error {
@@ -140,7 +160,7 @@ func (this *Connection) RemoteAddr() net.Addr {
 func (this *Connection) LostConnection() {
 	(*this.Conn).Close()
 	this.isClosed = true
-	logger.Info("LostConnection==============!!!!!!!!!!!!!!!!!!!!!!!!!")
+	logger.Info("LostConnection sessionId: ", this.SessionId)
 }
 
 func (this *Connection) StartWriteThread() {

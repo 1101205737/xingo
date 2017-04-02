@@ -1,5 +1,5 @@
-# xingo_cluster
-==================
+# xingo_cluster_nolock
+## 当前版本为gorotine安全的版本, 所有网络数据包处理和内部timer的处理均是在同一个gorotine完成<br>
 xingo golang游戏开发交流群：535378240<br>
 文档地址: http://www.w3cschool.cn/xingo/
 ```text
@@ -58,13 +58,16 @@ Data  []byte 数据<br>
   LogLevel:       logger.ERROR,//日志级别<br>
   SetToConsole:   true,//是否输出到console<br>
   LogFileType:    1,//日志切割方式1 按天切割 2按文件大小切割
-  PoolSize:       10,//api接口工作线程数量<br>
-  IsUsePool:      true,//是否使用worker pool false 每个请求开启单独的协程处理<br>
   MaxWorkerLen:   1024 * 2,//任务缓冲池大小<br>
   MaxSendChanLen: 1024,//发送队列从缓冲池<br>
   FrameSpeed:     30,//未使用<br>
+  MaxPacketSize:  1024,//协议数据包最大包体大小<br>
+  FrequencyControl: 100/s,//  100/h(每小时一百个包), 100/m(每分钟一百个包), 100/s(每秒一百个包)<br>
   OnConnectioned: func(fconn iface.Iconnection) {},//链接建立事件回调<br>
   OnClosed:       func(fconn iface.Iconnection) {},//链接断开事件回调<br>
+  OnServerStop:   func(), //服务器停服回调<br>
+  Protoc:         iface.IServerProtocol//socket数据pack和unpack的实现，可以通过设置该值重载服务器协议<br>
+  GsTimeScheduel: *timer.SafeTimerScheduel,//协程安全的timer<br>
   
   如何使用？<br>
   只需要一步，添加消息路由：<br>

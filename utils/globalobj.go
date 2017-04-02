@@ -6,6 +6,8 @@ import (
 	"github.com/viphxin/xingo/logger"
 	"github.com/viphxin/xingo/timer"
 	"io/ioutil"
+	"strconv"
+	"strings"
 )
 
 type GlobalObj struct {
@@ -37,6 +39,23 @@ type GlobalObj struct {
 	MaxSendChanLen   int32
 	FrameSpeed       uint8
 	Name             string
+	MaxPacketSize    uint32 //最大包体大小(不包括头部)
+	FrequencyControl string //  100/h, 100/m, 100/s
+}
+
+func (this *GlobalObj) GetFrequency() (int, string) {
+	fc := strings.Split(this.FrequencyControl, "/")
+	if len(fc) != 2 {
+		return 0, ""
+	} else {
+		fc0_int, err := strconv.Atoi(fc[0])
+		if err == nil {
+			return fc0_int, fc[1]
+		} else {
+			logger.Error("FrequencyControl params error: ", this.FrequencyControl)
+			return 0, ""
+		}
+	}
 }
 
 var GlobalObject *GlobalObj

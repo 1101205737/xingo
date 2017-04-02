@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/viphxin/xingo/iface"
 	"github.com/viphxin/xingo/logger"
+	"github.com/viphxin/xingo/utils"
 )
 
 type ConnectionType int8
@@ -24,6 +25,12 @@ type ConnectionMgr struct {
 }
 
 func (this *ConnectionMgr) Add(conn iface.Iconnection) {
+	if this.Len() >= utils.GlobalObject.MaxConn {
+		//client limit exceed
+		logger.Error("client limit exceed!!!")
+		conn.LostConnection()
+		return
+	}
 	conn.GetProtoc().OnConnectionMade(conn)
 	this.connections[conn.GetSessionId()] = conn
 	logger.Debug(fmt.Sprintf("Total connection: %d", len(this.connections)))
