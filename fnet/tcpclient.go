@@ -68,10 +68,11 @@ func (this *TcpClient) Stop(isforce bool) {
 	} else {
 		//retry
 		if this.ReConnection() {
+			//顺序很重要，先把读数据用的goroutine开启
+			this.Start()
 			if this.reconnCB != nil {
 				this.reconnCB(this)
 			}
-			this.Start()
 		}
 	}
 }
