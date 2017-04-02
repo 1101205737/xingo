@@ -179,7 +179,7 @@ func (this *ClusterServer) StartClusterServer() {
 }
 
 func (this *ClusterServer) ConnectToMaster() {
-	master := fnet.NewReConnTcpClient(this.Cconf.Master.Host, this.Cconf.Master.RootPort, utils.GlobalObject.RpcCProtoc, 512, 3, ReConnectMasterCB)
+	master := fnet.NewReConnTcpClient(this.Cconf.Master.Host, this.Cconf.Master.RootPort, utils.GlobalObject.RpcCProtoc, 1024, 60, ReConnectMasterCB)
 	this.MasterObj = master
 	master.Start()
 	//注册到master
