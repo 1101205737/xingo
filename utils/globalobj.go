@@ -1,23 +1,26 @@
 package utils
 
 import (
+	"encoding/json"
 	"github.com/viphxin/xingo/iface"
 	"github.com/viphxin/xingo/logger"
-	"encoding/json"
 	"io/ioutil"
 )
 
 type GlobalObj struct {
-	OnConnectioned func(fconn iface.Iconnection)
-	OnClosed       func(fconn iface.Iconnection)
-	OnClusterConnectioned func(fconn iface.Iconnection)//集群rpc root节点回调
-	OnClusterClosed       func(fconn iface.Iconnection)
-	OnClusterCConnectioned func(fconn iface.Iclient)//集群rpc 子节点回调
+	TcpServer              iface.Iserver
+	OnConnectioned         func(fconn iface.Iconnection)
+	OnClosed               func(fconn iface.Iconnection)
+	OnClusterConnectioned  func(fconn iface.Iconnection) //集群rpc root节点回调
+	OnClusterClosed        func(fconn iface.Iconnection)
+	OnClusterCConnectioned func(fconn iface.Iclient) //集群rpc 子节点回调
 	OnClusterCClosed       func(fconn iface.Iclient)
-	Protoc         iface.IServerProtocol
-	RpcCProtoc     iface.IClientProtocol
-	TcpPort        int
-	MaxConn        int
+	OnServerStop           func() //服务器停服回调
+	Protoc                 iface.IServerProtocol
+	RpcSProtoc             iface.IServerProtocol
+	RpcCProtoc             iface.IClientProtocol
+	TcpPort                int
+	MaxConn                int
 	//log
 	LogPath        string
 	LogName        string
@@ -39,25 +42,25 @@ var GlobalObject *GlobalObj
 
 func init() {
 	GlobalObject = &GlobalObj{
-		TcpPort:        8109,
-		MaxConn:        12000,
-		LogPath:        "./log",
-		LogName:        "server.log",
-		MaxLogNum:      10,
-		MaxFileSize:    100,
-		LogFileUnit:    logger.KB,
-		LogLevel:       logger.ERROR,
-		SetToConsole:   true,
-		LogFileType:    1,
-		PoolSize:       10,
-		IsUsePool:      true,
-		MaxWorkerLen:   1024 * 2,
-		MaxSendChanLen: 1024,
-		FrameSpeed:     30,
-		OnConnectioned: func(fconn iface.Iconnection) {},
-		OnClosed:       func(fconn iface.Iconnection) {},
-		OnClusterConnectioned: func(fconn iface.Iconnection) {},
-		OnClusterClosed:       func(fconn iface.Iconnection) {},
+		TcpPort:                8109,
+		MaxConn:                12000,
+		LogPath:                "./log",
+		LogName:                "server.log",
+		MaxLogNum:              10,
+		MaxFileSize:            100,
+		LogFileUnit:            logger.KB,
+		LogLevel:               logger.ERROR,
+		SetToConsole:           true,
+		LogFileType:            1,
+		PoolSize:               10,
+		IsUsePool:              true,
+		MaxWorkerLen:           1024 * 2,
+		MaxSendChanLen:         1024,
+		FrameSpeed:             30,
+		OnConnectioned:         func(fconn iface.Iconnection) {},
+		OnClosed:               func(fconn iface.Iconnection) {},
+		OnClusterConnectioned:  func(fconn iface.Iconnection) {},
+		OnClusterClosed:        func(fconn iface.Iconnection) {},
 		OnClusterCConnectioned: func(fconn iface.Iclient) {},
 		OnClusterCClosed:       func(fconn iface.Iclient) {},
 	}

@@ -1,70 +1,99 @@
 package fnet
 
 import (
-	"net"
-	"github.com/viphxin/xingo/iface"
-	"fmt"
-	"github.com/viphxin/xingo/logger"
 	"errors"
+	"fmt"
+	"github.com/viphxin/xingo/iface"
+	"github.com/viphxin/xingo/logger"
+	"net"
 	"sync"
 	"time"
 )
 
-type TcpClient struct{
-	conn *net.TCPConn
-	addr *net.TCPAddr
-	protoc iface.IClientProtocol
-	PropertyBag  map[string]interface{}
-	sendtagGuard sync.RWMutex
-	propertyLock sync.RWMutex
+const (
+	MAX_RETRY      = 1024 //父节点掉线最大重连次数
+	RETRY_INTERVAL = 60   //重连间隔60s
+)
+
+type TcpClient struct {
+	conn          *net.TCPConn
+	addr          *net.TCPAddr
+	protoc        iface.IClientProtocol
+	PropertyBag   map[string]interface{}
+	reconnCB      func(iface.Iclient)
+	maxRetry      int
+	retryInterval int
+	sendtagGuard  sync.RWMutex
+	propertyLock  sync.RWMutex
 }
 
-func NewTcpClient(ip string, port int, protoc iface.IClientProtocol) *TcpClient{
+func NewReConnTcpClient(ip string, port int, protoc iface.IClientProtocol, maxRetry int,
+	retryInterval int, reconnCB func(iface.Iclient)) *TcpClient {
+	client := NewTcpClient(ip, port, protoc)
+	client.maxRetry = maxRetry
+	client.retryInterval = retryInterval
+	client.reconnCB = reconnCB
+	return client
+}
+
+func NewTcpClient(ip string, port int, protoc iface.IClientProtocol) *TcpClient {
 	addr := &net.TCPAddr{
-		IP: net.ParseIP(ip),
+		IP:   net.ParseIP(ip),
 		Port: port,
 		Zone: "",
 	}
 	conn, err := net.DialTCP("tcp", nil, addr)
-	if err == nil{
+	if err == nil {
 		client := &TcpClient{
-		conn: conn,
-		addr: addr,
-		protoc: protoc,
-		PropertyBag: make(map[string]interface{}, 0),
+			conn:        conn,
+			addr:        addr,
+			protoc:      protoc,
+			PropertyBag: make(map[string]interface{}, 0),
 		}
 		go client.protoc.OnConnectionMade(client)
 		return client
-	}else{
+	} else {
 		panic(err)
 	}
 
 }
 
-func (this *TcpClient)Start(){
+func (this *TcpClient) Start() {
 	go this.protoc.StartReadThread(this)
 }
 
-func (this *TcpClient)Stop(){
-	this.protoc.OnConnectionLost(this)
+func (this *TcpClient) Stop(isforce bool) {
+	if this.maxRetry == 0 || isforce {
+		this.protoc.OnConnectionLost(this)
+	} else {
+		//retry
+		if this.ReConnection() && this.reconnCB != nil {
+			this.reconnCB(this)
+		}
+	}
 }
 
-func (this *TcpClient)ReConnection() bool{
+func (this *TcpClient) ReConnection() bool {
 	logger.Info("reconnection ...")
-	for i := 0; i < 10; i++ {
+	for i := 1; i <= this.maxRetry; i++ {
 		logger.Info("retry time ", i)
 		conn, err := net.DialTCP("tcp", nil, this.addr)
-		if err == nil{
+		if err == nil {
 			this.conn = conn
 			return true
-		}else{
-			time.Sleep(3*time.Second)
+		} else {
+			d, err := time.ParseDuration(fmt.Sprintf("%ds", this.retryInterval))
+			if err != nil {
+				time.Sleep(RETRY_INTERVAL * time.Second)
+			} else {
+				time.Sleep(d)
+			}
 		}
 	}
 	return false
 }
 
-func (this *TcpClient)Send(data []byte) error{
+func (this *TcpClient) Send(data []byte) error {
 	this.sendtagGuard.Lock()
 	defer this.sendtagGuard.Unlock()
 
@@ -75,7 +104,7 @@ func (this *TcpClient)Send(data []byte) error{
 	return nil
 }
 
-func (this *TcpClient)GetConnection() *net.TCPConn{
+func (this *TcpClient) GetConnection() *net.TCPConn {
 	return this.conn
 }
 

@@ -1,4 +1,5 @@
 package cluster
+
 /*
 	regest rpc
 */
@@ -8,7 +9,6 @@ import (
 	"github.com/viphxin/xingo/utils"
 	"math/rand"
 	"reflect"
-	"runtime/debug"
 	"time"
 )
 
@@ -18,10 +18,8 @@ type RpcMsgHandle struct {
 	Apis      map[string]reflect.Value
 }
 
-var RpcHandleObj *RpcMsgHandle
-
-func init() {
-	RpcHandleObj = &RpcMsgHandle{
+func NewRpcMsgHandle() *RpcMsgHandle {
+	return &RpcMsgHandle{
 		PoolSize:  utils.GlobalObject.PoolSize,
 		TaskQueue: make([]chan *RpcRequest, utils.GlobalObject.PoolSize),
 		Apis:      make(map[string]reflect.Value),
@@ -32,28 +30,28 @@ func init() {
 处理rpc消息
 */
 func (this *RpcMsgHandle) DoMsg(request *RpcRequest) {
-	if request.Rpcdata.MsgType == RESPONSE &&request.Rpcdata.Key != ""{
+	if request.Rpcdata.MsgType == RESPONSE && request.Rpcdata.Key != "" {
 		//放回异步结果
 		AResultGlobalObj.FillAsyncResult(request.Rpcdata.Key, request.Rpcdata)
 		return
-	}else{
+	} else {
 		//rpc 请求
-		if f, ok := RpcHandleObj.Apis[request.Rpcdata.Target]; ok {
+		if f, ok := this.Apis[request.Rpcdata.Target]; ok {
 			//存在
 			st := time.Now()
-			if request.Rpcdata.MsgType == REQUEST_FORRESULT{
+			if request.Rpcdata.MsgType == REQUEST_FORRESULT {
 				ret := f.Call([]reflect.Value{reflect.ValueOf(request)})
-				packdata, err := DefaultRpcDataPack.Pack(&RpcData{
+				packdata, err := utils.GlobalObject.RpcCProtoc.GetDataPack().Pack(0, &RpcData{
 					MsgType: RESPONSE,
-					Result: ret[0].Interface().(map[string]interface{}),
-					Key: request.Rpcdata.Key,
+					Result:  ret[0].Interface().(map[string]interface{}),
+					Key:     request.Rpcdata.Key,
 				})
-				if err == nil{
+				if err == nil {
 					request.Fconn.Send(packdata)
-				}else{
+				} else {
 					logger.Error(err)
 				}
-			}else if request.Rpcdata.MsgType == REQUEST_NORESULT{
+			} else if request.Rpcdata.MsgType == REQUEST_NORESULT {
 				f.Call([]reflect.Value{reflect.ValueOf(request)})
 			}
 
@@ -64,7 +62,8 @@ func (this *RpcMsgHandle) DoMsg(request *RpcRequest) {
 	}
 }
 
-func (this *RpcMsgHandle) DoMsg1(request *RpcRequest) {
+func (this *RpcMsgHandle) DeliverToMsgQueue(pkg interface{}) {
+	request := pkg.(*RpcRequest)
 	//add to worker pool
 	index := rand.Int31n(utils.GlobalObject.PoolSize)
 	taskQueue := this.TaskQueue[index]
@@ -72,7 +71,8 @@ func (this *RpcMsgHandle) DoMsg1(request *RpcRequest) {
 	taskQueue <- request
 }
 
-func (this *RpcMsgHandle) DoMsg2(request *RpcRequest) {
+func (this *RpcMsgHandle) DoMsgFromGoRoutine(pkg interface{}) {
+	request := pkg.(*RpcRequest)
 	go this.DoMsg(request)
 }
 
@@ -91,26 +91,17 @@ func (this *RpcMsgHandle) AddRouter(router interface{}) {
 	}
 }
 
-func (this *RpcMsgHandle) InitWorkerPool(poolSize int) {
+func (this *RpcMsgHandle) StartWorkerLoop(poolSize int) {
 	for i := 0; i < poolSize; i += 1 {
 		c := make(chan *RpcRequest, utils.GlobalObject.MaxWorkerLen)
-		RpcHandleObj.TaskQueue[i] = c
+		this.TaskQueue[i] = c
 		go func(index int, taskQueue chan *RpcRequest) {
 			logger.Info(fmt.Sprintf("init rpc thread pool %d.", index))
 			for {
-				defer func() {
-					if err := recover(); err != nil {
-						debug.PrintStack()
-						logger.Info("===================rpc call panic recover===============")
-					}
-				}()
-				for {
-					request := <-taskQueue
-					this.DoMsg(request)
-				}
+				request := <-taskQueue
+				this.DoMsg(request)
 			}
 
 		}(i, c)
 	}
 }
-

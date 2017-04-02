@@ -1,27 +1,40 @@
 package cluster
 
 import (
-	"fmt"
-	"github.com/viphxin/xingo/utils"
-	"github.com/viphxin/xingo/logger"
-	"github.com/viphxin/xingo/iface"
-	"io"
 	"encoding/json"
+	"fmt"
+	"github.com/viphxin/xingo/iface"
+	"github.com/viphxin/xingo/logger"
+	"github.com/viphxin/xingo/utils"
+	"io"
 )
 
 type RpcServerProtocol struct {
+	rpcMsgHandle *RpcMsgHandle
+	rpcDatapack  *RpcDataPack
 }
 
-func NewRpcServerProtocol() *RpcServerProtocol{
-	return &RpcServerProtocol{}
+func NewRpcServerProtocol() *RpcServerProtocol {
+	return &RpcServerProtocol{
+		rpcMsgHandle: NewRpcMsgHandle(),
+		rpcDatapack:  NewRpcDataPack(),
+	}
 }
 
-func (this *RpcServerProtocol)AddRpcRouter(router interface{}){
-	RpcHandleObj.AddRouter(router)
+func (this *RpcServerProtocol) GetMsgHandle() iface.Imsghandle {
+	return this.rpcMsgHandle
 }
 
-func (this *RpcServerProtocol) InitWorker(poolsize int32){
-	RpcHandleObj.InitWorkerPool(int(poolsize))
+func (this *RpcServerProtocol) GetDataPack() iface.Idatapack {
+	return this.rpcDatapack
+}
+
+func (this *RpcServerProtocol) AddRpcRouter(router interface{}) {
+	this.rpcMsgHandle.AddRouter(router)
+}
+
+func (this *RpcServerProtocol) InitWorker(poolsize int32) {
+	this.rpcMsgHandle.StartWorkerLoop(int(poolsize))
 }
 
 func (this *RpcServerProtocol) OnConnectionMade(fconn iface.Iconnection) {
@@ -38,43 +51,44 @@ func (this *RpcServerProtocol) StartReadThread(fconn iface.Iconnection) {
 	logger.Debug("start receive rpc data from socket...")
 	for {
 		//read per head data
-		headdata := make([]byte, DefaultRpcDataPack.GetHeadLen())
+		headdata := make([]byte, this.rpcDatapack.GetHeadLen())
 
 		if _, err := io.ReadFull(fconn.GetConnection(), headdata); err != nil {
 			logger.Error(err)
 			fconn.Stop()
 			return
 		}
-		pkgHead, err := DefaultRpcDataPack.Unpack(headdata)
+		pkgHead, err := this.rpcDatapack.Unpack(headdata)
 		if err != nil {
 			fconn.Stop()
 			return
 		}
 		//data
-		if pkgHead.Len > 0 {
-			pkgHead.Data = make([]byte, pkgHead.Len)
-			if _, err := io.ReadFull(fconn.GetConnection(), pkgHead.Data); err != nil {
+		pkg := pkgHead.(*RpcPackege)
+		if pkg.Len > 0 {
+			pkg.Data = make([]byte, pkg.Len)
+			if _, err := io.ReadFull(fconn.GetConnection(), pkg.Data); err != nil {
 				fconn.Stop()
 				return
-			}else{
+			} else {
 				rpcRequest := &RpcRequest{
-					Fconn: fconn,
+					Fconn:   fconn,
 					Rpcdata: &RpcData{},
 				}
 
-				err = json.Unmarshal(pkgHead.Data, rpcRequest.Rpcdata)
+				err = json.Unmarshal(pkg.Data, rpcRequest.Rpcdata)
 
-				if err != nil{
+				if err != nil {
 					logger.Error(err)
 					fconn.Stop()
 					return
 				}
 
-				logger.Debug(fmt.Sprintf("rpc call. data len: %d. MsgType: %d", pkgHead.Len, int(rpcRequest.Rpcdata.MsgType)))
-				if utils.GlobalObject.IsUsePool{
-					RpcHandleObj.DoMsg1(rpcRequest)
-				}else{
-					RpcHandleObj.DoMsg2(rpcRequest)
+				logger.Debug(fmt.Sprintf("rpc call. data len: %d. MsgType: %d", pkg.Len, int(rpcRequest.Rpcdata.MsgType)))
+				if utils.GlobalObject.IsUsePool && rpcRequest.Rpcdata.MsgType != RESPONSE {
+					this.rpcMsgHandle.DeliverToMsgQueue(rpcRequest)
+				} else {
+					this.rpcMsgHandle.DoMsgFromGoRoutine(rpcRequest)
 				}
 			}
 		}
@@ -82,59 +96,80 @@ func (this *RpcServerProtocol) StartReadThread(fconn iface.Iconnection) {
 }
 
 type RpcClientProtocol struct {
+	rpcMsgHandle *RpcMsgHandle
+	rpcDatapack  *RpcDataPack
 }
 
-func (this *RpcClientProtocol)AddRpcRouter(router interface{}){
-	RpcHandleObj.AddRouter(router)
+func NewRpcClientProtocol() *RpcClientProtocol {
+	return &RpcClientProtocol{
+		rpcMsgHandle: NewRpcMsgHandle(),
+		rpcDatapack:  NewRpcDataPack(),
+	}
 }
 
-func (this *RpcClientProtocol)OnConnectionMade(fconn iface.Iclient){
+func (this *RpcClientProtocol) GetMsgHandle() iface.Imsghandle {
+	return this.rpcMsgHandle
+}
+
+func (this *RpcClientProtocol) GetDataPack() iface.Idatapack {
+	return this.rpcDatapack
+}
+func (this *RpcClientProtocol) AddRpcRouter(router interface{}) {
+	this.rpcMsgHandle.AddRouter(router)
+}
+
+func (this *RpcClientProtocol) InitWorker(poolsize int32) {
+	this.rpcMsgHandle.StartWorkerLoop(int(poolsize))
+}
+
+func (this *RpcClientProtocol) OnConnectionMade(fconn iface.Iclient) {
 	utils.GlobalObject.OnClusterCConnectioned(fconn)
 }
 
-func (this *RpcClientProtocol)OnConnectionLost(fconn iface.Iclient){
+func (this *RpcClientProtocol) OnConnectionLost(fconn iface.Iclient) {
 	utils.GlobalObject.OnClusterCClosed(fconn)
 }
 
-func (this *RpcClientProtocol)StartReadThread(fconn iface.Iclient){
+func (this *RpcClientProtocol) StartReadThread(fconn iface.Iclient) {
 	logger.Debug("start receive rpc data from socket...")
 	for {
 		//read per head data
-		headdata := make([]byte, DefaultRpcDataPack.GetHeadLen())
+		headdata := make([]byte, this.rpcDatapack.GetHeadLen())
 
 		if _, err := io.ReadFull(fconn.GetConnection(), headdata); err != nil {
 			logger.Error(err)
-			fconn.Stop()
+			fconn.Stop(false)
 			return
 		}
-		pkgHead, err := DefaultRpcDataPack.Unpack(headdata)
+		pkgHead, err := this.rpcDatapack.Unpack(headdata)
 		if err != nil {
-			fconn.Stop()
+			fconn.Stop(false)
 			return
 		}
 		//data
-		if pkgHead.Len > 0 {
-			pkgHead.Data = make([]byte, pkgHead.Len)
-			if _, err := io.ReadFull(fconn.GetConnection(), pkgHead.Data); err != nil {
-				fconn.Stop()
+		pkg := pkgHead.(*RpcPackege)
+		if pkg.Len > 0 {
+			pkg.Data = make([]byte, pkg.Len)
+			if _, err := io.ReadFull(fconn.GetConnection(), pkg.Data); err != nil {
+				fconn.Stop(false)
 				return
-			}else{
+			} else {
 				rpcRequest := &RpcRequest{
-					Fconn: fconn,
+					Fconn:   fconn,
 					Rpcdata: &RpcData{},
 				}
-				err = json.Unmarshal(pkgHead.Data, rpcRequest.Rpcdata)
-				if err != nil{
+				err = json.Unmarshal(pkg.Data, rpcRequest.Rpcdata)
+				if err != nil {
 					logger.Error("json.Unmarshal error!!!")
-					fconn.Stop()
+					fconn.Stop(false)
 					return
 				}
 
-				logger.Debug(fmt.Sprintf("rpc call. data len: %d. MsgType: %d", pkgHead.Len, rpcRequest.Rpcdata.MsgType))
-				if utils.GlobalObject.IsUsePool{
-					RpcHandleObj.DoMsg1(rpcRequest)
-				}else{
-					RpcHandleObj.DoMsg2(rpcRequest)
+				logger.Debug(fmt.Sprintf("rpc call. data len: %d. MsgType: %d", pkg.Len, rpcRequest.Rpcdata.MsgType))
+				if utils.GlobalObject.IsUsePool && rpcRequest.Rpcdata.MsgType != RESPONSE {
+					this.rpcMsgHandle.DeliverToMsgQueue(rpcRequest)
+				} else {
+					this.rpcMsgHandle.DoMsgFromGoRoutine(rpcRequest)
 				}
 			}
 		}

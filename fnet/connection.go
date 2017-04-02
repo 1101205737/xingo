@@ -2,13 +2,13 @@ package fnet
 
 import (
 	"errors"
+	"fmt"
+	"github.com/viphxin/xingo/iface"
 	"github.com/viphxin/xingo/logger"
+	"github.com/viphxin/xingo/utils"
 	"net"
 	"sync"
 	"time"
-	"github.com/viphxin/xingo/iface"
-	"github.com/viphxin/xingo/utils"
-	"fmt"
 )
 
 type Connection struct {
@@ -26,11 +26,11 @@ type Connection struct {
 
 func NewConnection(conn *net.TCPConn, sessionId uint32, protoc iface.IServerProtocol) *Connection {
 	fconn := &Connection{
-		Conn:        conn,
-		isClosed:    false,
-		SessionId:   sessionId,
-		Protoc:      protoc,
-		PropertyBag: make(map[string]interface{}),
+		Conn:         conn,
+		isClosed:     false,
+		SessionId:    sessionId,
+		Protoc:       protoc,
+		PropertyBag:  make(map[string]interface{}),
 		SendBuffChan: make(chan []byte, utils.GlobalObject.MaxSendChanLen),
 		ExtSendChan:  make(chan bool, 1),
 	}
@@ -41,7 +41,7 @@ func NewConnection(conn *net.TCPConn, sessionId uint32, protoc iface.IServerProt
 
 func (this *Connection) Start() {
 	//add to connectionmsg
-	ConnectionManager.Add(this)
+	utils.GlobalObject.TcpServer.GetConnectionMgr().Add(this)
 	this.Protoc.OnConnectionMade(this)
 	this.StartWriteThread()
 	this.Protoc.StartReadThread(this)
@@ -57,7 +57,7 @@ func (this *Connection) Stop() {
 	//掉线回调放到go内防止，掉线回调处理出线死锁
 	go this.Protoc.OnConnectionLost(this)
 	//remove to connectionmsg
-	ConnectionManager.Remove(this)
+	utils.GlobalObject.TcpServer.GetConnectionMgr().Remove(this)
 	close(this.ExtSendChan)
 	close(this.SendBuffChan)
 }
@@ -165,4 +165,3 @@ func (this *Connection) StartWriteThread() {
 		}
 	}()
 }
-
